@@ -1,54 +1,84 @@
 package com.example.easycooking.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.media.AudioManager
+import android.media.ToneGenerator
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.easycooking.data.repository.AppRepository
 import com.example.easycooking.model.FilterState
-import com.example.easycooking.model.GroceryItem
 import com.example.easycooking.model.GroceryList
-import com.example.easycooking.model.Ingredient
 import com.example.easycooking.model.Recipe
-import com.example.easycooking.model.RecipeStep
 import com.example.easycooking.model.ReviewItem
 import com.example.easycooking.navigation.BottomTab
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
-class CookingViewModel : ViewModel() {
+class CookingViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val repository = AppRepository(application)
 
     private val _currentTab = MutableStateFlow(BottomTab.DISCOVER)
     val currentTab: StateFlow<BottomTab> = _currentTab.asStateFlow()
 
-    private val _recipes = MutableStateFlow<List<Recipe>>(emptyList())
-    val recipes: StateFlow<List<Recipe>> = _recipes.asStateFlow()
+    // 1. DATA MASTER RECIPES DARI ROOM DATABASE
+    val recipes: StateFlow<List<Recipe>> = repository.getAllRecipes()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _groceryLists = MutableStateFlow<List<GroceryList>>(emptyList())
-    val groceryLists: StateFlow<List<GroceryList>> = _groceryLists.asStateFlow()
+    // 2. DATA DAFTAR BELANJA DARI ROOM DATABASE
+    val groceryLists: StateFlow<List<GroceryList>> = repository.getGroceryLists()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // 3. FILTER & SEARCH QUERY STATE
     private val _filterState = MutableStateFlow(FilterState())
     val filterState: StateFlow<FilterState> = _filterState.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
+    // 4. PREFERENSI ALERGEN & DIET (DATASTORE BACKED)
+    val selectedAllergens: StateFlow<Set<String>> = repository.preferencesManager.selectedAllergensFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), setOf("Peanuts", "Tree Nuts"))
+
+    val selectedDietaryLifestyles: StateFlow<Set<String>> = repository.preferencesManager.selectedDietaryFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), setOf("Vegetarian", "Gluten-Free"))
+
+    val strictAllergenFilter: StateFlow<Boolean> = repository.preferencesManager.strictAllergenFilterFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val isMetricUnit: StateFlow<Boolean> = repository.preferencesManager.isMetricUnitFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    // 5. PORSI DINAMIS (FUNGSI 2) - Validasi 1 s.d 50 sajian
     private val _servingsCount = MutableStateFlow(2)
     val servingsCount: StateFlow<Int> = _servingsCount.asStateFlow()
 
+    // 6. COOKING MODE & TIMER TERINTEGRASI (FUNGSI 3)
     private val _currentCookingStep = MutableStateFlow(1)
     val currentCookingStep: StateFlow<Int> = _currentCookingStep.asStateFlow()
 
-    private val _selectedDietaryLifestyles = MutableStateFlow(setOf("Vegetarian", "Gluten-Free"))
-    val selectedDietaryLifestyles: StateFlow<Set<String>> = _selectedDietaryLifestyles.asStateFlow()
+    private val _timerSecondsLeft = MutableStateFlow(0)
+    val timerSecondsLeft: StateFlow<Int> = _timerSecondsLeft.asStateFlow()
 
-    private val _selectedAllergens = MutableStateFlow(setOf("Peanuts", "Tree Nuts"))
-    val selectedAllergens: StateFlow<Set<String>> = _selectedAllergens.asStateFlow()
+    private val _isTimerRunning = MutableStateFlow(false)
+    val isTimerRunning: StateFlow<Boolean> = _isTimerRunning.asStateFlow()
 
-    private val _strictAllergenFilter = MutableStateFlow(true)
-    val strictAllergenFilter: StateFlow<Boolean> = _strictAllergenFilter.asStateFlow()
+    private val _isTimerDone = MutableStateFlow(false)
+    val isTimerDone: StateFlow<Boolean> = _isTimerDone.asStateFlow()
 
-    private val _isMetricUnit = MutableStateFlow(true)
-    val isMetricUnit: StateFlow<Boolean> = _isMetricUnit.asStateFlow()
+    private var timerJob: Job? = null
 
+    // 7. NEW RECIPE CREATOR STATE
     private val _newRecipeTitle = MutableStateFlow("Creamy Tuscan Garlic Chicken")
     val newRecipeTitle: StateFlow<String> = _newRecipeTitle.asStateFlow()
 
@@ -67,190 +97,63 @@ class CookingViewModel : ViewModel() {
     )
     val newRecipeIngredients: StateFlow<List<String>> = _newRecipeIngredients.asStateFlow()
 
-    init {
-        loadInitialData()
+    /**
+     * FUNGSI 1: Sistem Penyaringan Cerdas Multi-Kriteria & Strict Allergen Engine
+     * Mengolah query relasional secara berkelanjutan pada Dispatchers.Default mencakup:
+     * - Rentang waktu memasak (<15m, 15-30m, 30-60m, 1h+)
+     * - Kategori waktu makan (Breakfast, Lunch, Dinner, Snack)
+     * - Pola diet (Gluten-Free, Dairy-Free, Vegetarian, dll.)
+     * - Strict Allergen Filter: eliminasi otomatis jika recipe.allergens.intersect(user.allergens).isNotEmpty()
+     */
+    val filteredRecipes: StateFlow<List<Recipe>> = combine(
+        recipes,
+        filterState,
+        searchQuery,
+        selectedAllergens,
+        strictAllergenFilter
+    ) { rList, filter, query, userAllergens, strictFilter ->
+        rList.filter { recipe ->
+            // A. Strict Allergen Safety Engine
+            val isAllergenSafe = if (strictFilter && userAllergens.isNotEmpty()) {
+                recipe.allergens.none { it in userAllergens }
+            } else true
+
+            // B. Filter Rentang Waktu Masak
+            val matchesDuration = when (filter.selectedDuration) {
+                "< 15m", "< 15 Mins" -> recipe.durationMinutes < 15
+                "15-30m" -> recipe.durationMinutes in 15..30
+                "30-60m" -> recipe.durationMinutes in 31..60
+                "1h+" -> recipe.durationMinutes > 60
+                else -> true
+            }
+
+            // C. Filter Kategori Waktu Makan
+            val matchesMealType = if (filter.selectedMealType.isNotBlank() && filter.selectedMealType != "All") {
+                recipe.category.equals(filter.selectedMealType, ignoreCase = true)
+            } else true
+
+            // D. Filter Gaya Hidup Diet
+            val matchesDietary = if (filter.selectedDietary.isNotEmpty()) {
+                filter.selectedDietary.any { badge -> recipe.dietaryBadges.contains(badge) }
+            } else true
+
+            // E. Pencarian Kata Kunci Teks Bebas
+            val matchesQuery = if (query.isNotBlank()) {
+                recipe.title.contains(query, ignoreCase = true) ||
+                        recipe.chefName.contains(query, ignoreCase = true) ||
+                        recipe.ingredients.any { it.name.contains(query, ignoreCase = true) }
+            } else true
+
+            isAllergenSafe && matchesDuration && matchesMealType && matchesDietary && matchesQuery
+        }
     }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private fun loadInitialData() {
-        val defaultIngredients = listOf(
-            Ingredient("1", "Chicken breast", "tender diced fillets", 400.0, "g", "Produce & Meat"),
-            Ingredient("2", "Garlic", "finely minced", 3.0, "cloves", "Produce"),
-            Ingredient("3", "Heavy cream", "rich cooking cream", 100.0, "ml", "Dairy & Eggs"),
-            Ingredient("4", "Olive oil", "extra virgin", 1.0, "tbsp", "Pantry Essentials"),
-            Ingredient("5", "Baby spinach & sun-dried tomatoes", "fresh & chopped", 50.0, "g", "Produce & Specialty")
-        )
-
-        val defaultSteps = listOf(
-            RecipeStep(
-                stepNumber = 1,
-                title = "Sear Chicken",
-                description = "Heat olive oil in a deep skillet over medium-high heat. Brown seasoned chicken breasts 4-5 minutes per side until deeply golden brown.",
-                durationMinutes = 6,
-                tip = "Make sure the pan is hot before adding chicken for optimal sear."
-            ),
-            RecipeStep(
-                stepNumber = 2,
-                title = "Simmer Garlic Cream",
-                description = "Saute minced garlic for 1 minute, then pour rich heavy cream & sun-dried tomatoes. Simmer gently on low heat until velvety smooth.",
-                durationMinutes = 5,
-                tip = "Keep heat at medium-low to prevent cream from curdling."
-            ),
-            RecipeStep(
-                stepNumber = 3,
-                title = "Combine & Garnish",
-                description = "Return chicken breasts into the skillet with warm garlic cream sauce. Spoon sauce generously over chicken and garnish with freshly chopped basil and shaved parmesan.",
-                durationMinutes = 4,
-                isFinalStep = true,
-                tip = "Let rest for 2 minutes before serving so the chicken retains its juiciness."
-            )
-        )
-
-        val defaultReviews = listOf(
-            ReviewItem("r1", "Sarah K.", 5, "2d ago", "Super easy for weeknights, the garlic aroma is incredible! Paired it with freshly toasted sourdough."),
-            ReviewItem("r2", "Alex M.", 4, "5d ago", "Delicious sauce, perfectly balanced with the chicken. Added extra sun-dried tomatoes for sweetness.")
-        )
-
-        val initialRecipes = listOf(
-            Recipe(
-                id = "1",
-                title = "Tuscan Garlic Chicken",
-                chefName = "Chef Maria",
-                difficulty = "Easy",
-                durationMinutes = 25,
-                calories = 420,
-                rating = 4.8,
-                reviewCount = 420,
-                isBookmarked = true,
-                category = "Dinner",
-                dietaryBadges = listOf("Gluten-Free", "Nut-Free"),
-                ingredients = defaultIngredients,
-                steps = defaultSteps,
-                reviews = defaultReviews
-            ),
-            Recipe(
-                id = "2",
-                title = "Lemon Butter Salmon",
-                chefName = "Chef Maria",
-                difficulty = "Easy",
-                durationMinutes = 20,
-                calories = 420,
-                rating = 4.9,
-                reviewCount = 310,
-                isBookmarked = true,
-                category = "Dinner",
-                dietaryBadges = listOf("Gluten-Free", "Low Carb"),
-                ingredients = defaultIngredients,
-                steps = defaultSteps,
-                reviews = defaultReviews
-            ),
-            Recipe(
-                id = "3",
-                title = "Creamy Truffle Pasta",
-                chefName = "Chef Elena Vance",
-                difficulty = "Medium",
-                durationMinutes = 25,
-                calories = 380,
-                rating = 4.8,
-                reviewCount = 180,
-                isBookmarked = false,
-                category = "Dinner",
-                dietaryBadges = listOf("Vegetarian"),
-                ingredients = defaultIngredients,
-                steps = defaultSteps,
-                reviews = defaultReviews
-            ),
-            Recipe(
-                id = "4",
-                title = "Garlic Herb Chicken",
-                chefName = "Chef Maria",
-                difficulty = "Easy",
-                durationMinutes = 15,
-                calories = 350,
-                rating = 4.8,
-                reviewCount = 95,
-                isBookmarked = false,
-                category = "Dinner",
-                dietaryBadges = listOf("Gluten-Free"),
-                ingredients = defaultIngredients,
-                steps = defaultSteps,
-                reviews = defaultReviews
-            ),
-            Recipe(
-                id = "5",
-                title = "Avocado Pesto Pasta",
-                chefName = "Chef Alex",
-                difficulty = "Easy",
-                durationMinutes = 12,
-                calories = 320,
-                rating = 4.7,
-                reviewCount = 140,
-                isBookmarked = true,
-                category = "Lunch",
-                dietaryBadges = listOf("Vegan", "Dairy-Free"),
-                ingredients = defaultIngredients,
-                steps = defaultSteps,
-                reviews = defaultReviews
-            ),
-            Recipe(
-                id = "6",
-                title = "Berry Acai Bowl",
-                chefName = "Chef Alex",
-                difficulty = "Easy",
-                durationMinutes = 10,
-                calories = 260,
-                rating = 5.0,
-                reviewCount = 88,
-                isBookmarked = true,
-                category = "Breakfast",
-                dietaryBadges = listOf("Vegan", "Gluten-Free"),
-                ingredients = defaultIngredients,
-                steps = defaultSteps,
-                reviews = defaultReviews
-            )
-        )
-
-        _recipes.value = initialRecipes
-
-        val initialGrocery = listOf(
-            GroceryList(
-                id = "g1",
-                title = "Tuscan Garlic Chicken",
-                updatedAt = "Updated 2h ago",
-                items = listOf(
-                    GroceryItem("gi1", "400g Chicken breast", "Produce & Meat", isChecked = true),
-                    GroceryItem("gi2", "1 tbsp Olive oil", "Pantry Essentials", isChecked = true),
-                    GroceryItem("gi3", "3 cloves Fresh Garlic", "Produce", isChecked = false),
-                    GroceryItem("gi4", "100ml Heavy whipping cream", "Dairy & Eggs", isChecked = false),
-                    GroceryItem("gi5", "50g Baby spinach & sun-dried tomatoes", "Produce & Specialty", isChecked = false)
-                )
-            ),
-            GroceryList(
-                id = "g2",
-                title = "Berry Blast Smoothie",
-                updatedAt = "Updated 5h ago",
-                items = listOf(
-                    GroceryItem("gi6", "Fresh Strawberries", "Produce", isChecked = true),
-                    GroceryItem("gi7", "Almond Milk", "Dairy Alternatives", isChecked = true),
-                    GroceryItem("gi8", "Chia Seeds", "Pantry", isChecked = false),
-                    GroceryItem("gi9", "Organic Honey", "Pantry", isChecked = false)
-                )
-            ),
-            GroceryList(
-                id = "g3",
-                title = "Avocado Pasta",
-                updatedAt = "Yesterday",
-                isCompleted = true,
-                items = listOf(
-                    GroceryItem("gi10", "Ripe Avocados", "Produce", isChecked = true),
-                    GroceryItem("gi11", "Spaghetti Pasta", "Pantry", isChecked = true),
-                    GroceryItem("gi12", "Fresh Basil", "Produce", isChecked = true),
-                    GroceryItem("gi13", "Lemon", "Produce", isChecked = true),
-                    GroceryItem("gi14", "Garlic cloves", "Produce", isChecked = true)
-                )
-            )
-        )
-
-        _groceryLists.value = initialGrocery
+    init {
+        viewModelScope.launch {
+            repository.seedDatabaseIfEmpty()
+        }
     }
 
     fun setBottomTab(tab: BottomTab) {
@@ -262,80 +165,138 @@ class CookingViewModel : ViewModel() {
     }
 
     fun toggleBookmark(recipeId: String) {
-        _recipes.update { list ->
-            list.map {
-                if (it.id == recipeId) it.copy(isBookmarked = !it.isBookmarked) else it
-            }
+        viewModelScope.launch {
+            val currentRecipe = recipes.value.find { it.id == recipeId } ?: return@launch
+            repository.toggleBookmark(recipeId, currentRecipe.isBookmarked)
         }
     }
 
+    // FUNGSI 2: Penyesuaian Porsi Dinamis (Batas 1 s.d 50 porsi)
     fun incrementServings() {
-        _servingsCount.update { it + 1 }
+        _servingsCount.update { if (it < 50) it + 1 else 50 }
     }
 
     fun decrementServings() {
         _servingsCount.update { if (it > 1) it - 1 else 1 }
     }
 
-    fun setCookingStep(step: Int) {
+    fun toggleMeasurementUnit() {
+        viewModelScope.launch {
+            repository.preferencesManager.setMetricUnit(!isMetricUnit.value)
+        }
+    }
+
+    // FUNGSI 3: Cooking Mode & Countdown Timer per Detik
+    fun setCookingStep(step: Int, initialMinutes: Int = 5) {
         _currentCookingStep.value = step
+        resetTimer(initialMinutes)
+    }
+
+    fun startStepTimer(minutes: Int) {
+        if (_isTimerRunning.value) {
+            pauseTimer()
+            return
+        }
+
+        if (_timerSecondsLeft.value <= 0) {
+            _timerSecondsLeft.value = minutes * 60
+        }
+
+        _isTimerRunning.value = true
+        _isTimerDone.value = false
+
+        timerJob?.cancel()
+        timerJob = viewModelScope.launch(Dispatchers.Default) {
+            while (_timerSecondsLeft.value > 0 && _isTimerRunning.value) {
+                delay(1000)
+                _timerSecondsLeft.update { it - 1 }
+            }
+
+            if (_timerSecondsLeft.value <= 0 && _isTimerRunning.value) {
+                _isTimerRunning.value = false
+                _isTimerDone.value = true
+                playAlertSound()
+            }
+        }
+    }
+
+    fun pauseTimer() {
+        _isTimerRunning.value = false
+        timerJob?.cancel()
+    }
+
+    fun addExtraMinute() {
+        _timerSecondsLeft.update { it + 60 }
+        _isTimerDone.value = false
+    }
+
+    fun resetTimer(minutes: Int) {
+        timerJob?.cancel()
+        _isTimerRunning.value = false
+        _isTimerDone.value = false
+        _timerSecondsLeft.value = minutes * 60
+    }
+
+    private fun playAlertSound() {
+        try {
+            val toneGen = ToneGenerator(AudioManager.STREAM_ALARM, 100)
+            toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 1000)
+        } catch (_: Exception) {}
+    }
+
+    fun calculateProgress(currentStep: Int, totalSteps: Int): Float {
+        return if (totalSteps > 0) currentStep.toFloat() / totalSteps.toFloat() else 0f
+    }
+
+    // FUNGSI 4: Agregasi Otomatis Bahan ke Daftar Belanja
+    fun exportRecipeToGrocery(recipe: Recipe) {
+        viewModelScope.launch {
+            repository.exportRecipeToGrocery(recipe, _servingsCount.value)
+        }
     }
 
     fun toggleGroceryItemCheck(listId: String, itemId: String) {
-        _groceryLists.update { lists ->
-            lists.map { list ->
-                if (list.id == listId) {
-                    val updatedItems = list.items.map { item ->
-                        if (item.id == itemId) item.copy(isChecked = !item.isChecked) else item
-                    }
-                    val isAllChecked = updatedItems.isNotEmpty() && updatedItems.all { it.isChecked }
-                    list.copy(items = updatedItems, isCompleted = isAllChecked)
-                } else {
-                    list
-                }
-            }
+        viewModelScope.launch {
+            val list = groceryLists.value.find { it.id == listId } ?: return@launch
+            val item = list.items.find { it.id == itemId } ?: return@launch
+            repository.toggleGroceryItem(itemId, item.isChecked, listId)
         }
     }
 
     fun addCustomGroceryItem(listId: String, itemName: String) {
         if (itemName.isBlank()) return
-        _groceryLists.update { lists ->
-            lists.map { list ->
-                if (list.id == listId) {
-                    val newItem = GroceryItem(
-                        id = "custom_${System.currentTimeMillis()}",
-                        name = itemName.trim(),
-                        category = "Custom Item",
-                        isChecked = false
-                    )
-                    list.copy(items = list.items + newItem, isCompleted = false)
-                } else {
-                    list
-                }
-            }
+        viewModelScope.launch {
+            repository.addCustomGroceryItem(listId, itemName)
         }
     }
 
     fun deleteGroceryList(listId: String) {
-        _groceryLists.update { lists ->
-            lists.filterNot { it.id == listId }
+        viewModelScope.launch {
+            repository.deleteGroceryList(listId)
         }
     }
 
+    // Filter Controls
     fun toggleDietaryLifestyle(lifestyle: String) {
-        _selectedDietaryLifestyles.update { current ->
-            if (current.contains(lifestyle)) current - lifestyle else current + lifestyle
+        viewModelScope.launch {
+            val current = selectedDietaryLifestyles.value
+            val newSet = if (current.contains(lifestyle)) current - lifestyle else current + lifestyle
+            repository.preferencesManager.setSelectedDietary(newSet)
         }
     }
 
     fun toggleAllergen(allergen: String) {
-        _selectedAllergens.update { current ->
-            if (current.contains(allergen)) current - allergen else current + allergen
+        viewModelScope.launch {
+            val current = selectedAllergens.value
+            val newSet = if (current.contains(allergen)) current - allergen else current + allergen
+            repository.preferencesManager.setSelectedAllergens(newSet)
         }
     }
 
     fun setStrictAllergenFilter(enabled: Boolean) {
-        _strictAllergenFilter.value = enabled
+        viewModelScope.launch {
+            repository.preferencesManager.setStrictAllergenFilter(enabled)
+        }
     }
 
     fun updateFilterDuration(duration: String) {
@@ -358,12 +319,13 @@ class CookingViewModel : ViewModel() {
         _filterState.value = FilterState()
     }
 
+    // Creator View
     fun updateNewRecipeTitle(title: String) {
         _newRecipeTitle.value = title
     }
 
     fun incrementNewRecipeServings() {
-        _newRecipeServings.update { it + 1 }
+        _newRecipeServings.update { if (it < 50) it + 1 else 50 }
     }
 
     fun decrementNewRecipeServings() {
@@ -386,29 +348,6 @@ class CookingViewModel : ViewModel() {
         }
     }
 
-    fun toggleMeasurementUnit() {
-        _isMetricUnit.update { !it }
-    }
-
-    fun exportRecipeToGrocery(recipe: Recipe) {
-        val isMetric = _isMetricUnit.value
-        val newItems = recipe.ingredients.map {
-            GroceryItem(
-                id = "exp_${recipe.id}_${it.id}",
-                name = "${it.formattedAmount(_servingsCount.value / 2.0, isMetric = isMetric)} ${it.name}",
-                category = it.category,
-                isChecked = false
-            )
-        }
-        val newList = GroceryList(
-            id = "list_${System.currentTimeMillis()}",
-            title = recipe.title,
-            updatedAt = "Just now",
-            items = newItems
-        )
-        _groceryLists.update { listOf(newList) + it }
-    }
-
     fun addReview(recipeId: String, rating: Int, comment: String) {
         val newReview = ReviewItem(
             id = "rev_${System.currentTimeMillis()}",
@@ -417,15 +356,6 @@ class CookingViewModel : ViewModel() {
             timeAgo = "Just now",
             comment = comment
         )
-        _recipes.update { list ->
-            list.map {
-                if (it.id == recipeId) {
-                    it.copy(
-                        reviews = listOf(newReview) + it.reviews,
-                        reviewCount = it.reviewCount + 1
-                    )
-                } else it
-            }
-        }
+        repository.addReviewInMemory(recipeId, newReview)
     }
 }

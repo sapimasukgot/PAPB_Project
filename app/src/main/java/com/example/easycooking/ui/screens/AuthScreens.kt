@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
@@ -24,6 +25,9 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -130,6 +135,43 @@ fun LoginScreen(
     var email by remember { mutableStateOf("alex@example.com") }
     var password by remember { mutableStateOf("************") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var showPasswordErrorDialog by remember { mutableStateOf(false) }
+
+    if (showPasswordErrorDialog) {
+        AlertDialog(
+            onDismissRequest = { showPasswordErrorDialog = false },
+            title = {
+                Text(
+                    text = "Warning Password Salah",
+                    fontWeight = FontWeight.Bold,
+                    color = DarkText
+                )
+            },
+            text = {
+                Text(
+                    text = "Alamat email atau kata sandi yang Anda masukkan tidak sesuai dengan database akun terdaftar. Silakan periksa kembali atau pilih Lupa Kata Sandi.",
+                    color = DarkTextSecondary,
+                    fontSize = 13.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showPasswordErrorDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryYellow)
+                ) {
+                    Text("Coba Lagi", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showPasswordErrorDialog = false
+                    onForgotPasswordClick()
+                }) {
+                    Text("Lupa Kata Sandi?", color = DarkText)
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -263,7 +305,13 @@ fun LoginScreen(
 
         PrimaryYellowButton(
             text = "Sign In",
-            onClick = onSignInSuccess
+            onClick = {
+                if (password.length < 4 || !email.contains("@")) {
+                    showPasswordErrorDialog = true
+                } else {
+                    onSignInSuccess()
+                }
+            }
         )
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -502,7 +550,10 @@ fun ForgotPasswordScreen(
     onSendCodeClick: () -> Unit,
     onLoginClick: () -> Unit
 ) {
+    var recoveryStep by remember { mutableIntStateOf(0) }
     var email by remember { mutableStateOf("alex@kitchen.com") }
+    var otpCode by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -511,7 +562,9 @@ fun ForgotPasswordScreen(
             .padding(24.dp)
     ) {
         IconButton(
-            onClick = onBackClick,
+            onClick = {
+                if (recoveryStep > 0) recoveryStep -= 1 else onBackClick()
+            },
             modifier = Modifier.padding(top = 16.dp)
         ) {
             Icon(
@@ -535,9 +588,12 @@ fun ForgotPasswordScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Lock,
+                    imageVector = when (recoveryStep) {
+                        3 -> Icons.Filled.Check
+                        else -> Icons.Filled.Lock
+                    },
                     contentDescription = null,
-                    tint = Color(0xFF7D5800),
+                    tint = if (recoveryStep == 3) Color(0xFF2E7D32) else Color(0xFFE65100),
                     modifier = Modifier.size(36.dp)
                 )
             }
@@ -545,14 +601,24 @@ fun ForgotPasswordScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             Text(
-                text = "Forgot Password?",
+                text = when (recoveryStep) {
+                    0 -> "Forgot Password?"
+                    1 -> "Verifikasi Kode OTP"
+                    2 -> "Buat Password Baru"
+                    else -> "Password Telah Diubah!"
+                },
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 color = DarkText
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Don't worry! Enter your registered email and we'll send a verification code to get you back cooking.",
+                text = when (recoveryStep) {
+                    0 -> "Masukkan email terdaftar untuk menerima kode verifikasi pemulihan (OTP)."
+                    1 -> "Kode OTP 6-digit telah dikirimkan ke $email. Silakan masukkan kode untuk memverifikasi identitas."
+                    2 -> "Kredensial berhasil diverifikasi. Masukkan kata sandi baru untuk akun Anda."
+                    else -> "Kata sandi akun Anda berhasil diperbarui. Silakan login kembali dengan password baru."
+                },
                 fontSize = 13.sp,
                 color = DarkTextSecondary,
                 textAlign = TextAlign.Center,
@@ -562,57 +628,115 @@ fun ForgotPasswordScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        Text(
-            text = "Email Address",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = DarkText
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            leadingIcon = {
-                Icon(Icons.Filled.Email, contentDescription = null, tint = DarkTextSecondary)
-            },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = DarkText,
-                unfocusedTextColor = DarkText,
-                cursorColor = DarkText,
-                focusedContainerColor = LightGrayBg,
-                unfocusedContainerColor = LightGrayBg,
-                focusedBorderColor = PrimaryYellow,
-                unfocusedBorderColor = Color.Transparent
-            )
-        )
+        when (recoveryStep) {
+            0 -> {
+                Text(
+                    text = "Email Address",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = DarkText
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    leadingIcon = {
+                        Icon(Icons.Filled.Email, contentDescription = null, tint = DarkTextSecondary)
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = DarkText,
+                        unfocusedTextColor = DarkText,
+                        cursorColor = DarkText,
+                        focusedContainerColor = LightGrayBg,
+                        unfocusedContainerColor = LightGrayBg,
+                        focusedBorderColor = PrimaryYellow,
+                        unfocusedBorderColor = Color.Transparent
+                    )
+                )
 
-        Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(28.dp))
 
-        Text(
-            text = "Note: A 6-digit verification code will be sent to this email.",
-            fontSize = 12.sp,
-            color = DarkTextSecondary
-        )
+                PrimaryYellowButton(
+                    text = "Send Verification Code",
+                    onClick = { recoveryStep = 1 }
+                )
+            }
+            1 -> {
+                Text(
+                    text = "Kode Verifikasi (OTP)",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = DarkText
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = otpCode,
+                    onValueChange = { if (it.length <= 6) otpCode = it },
+                    placeholder = { Text("Contoh: 482910", color = DarkTextSecondary) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = DarkText,
+                        unfocusedTextColor = DarkText,
+                        cursorColor = DarkText,
+                        focusedContainerColor = LightGrayBg,
+                        unfocusedContainerColor = LightGrayBg,
+                        focusedBorderColor = PrimaryYellow,
+                        unfocusedBorderColor = Color.Transparent
+                    )
+                )
 
-        Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(28.dp))
 
-        PrimaryYellowButton(
-            text = "Send Verification Code",
-            onClick = onSendCodeClick
-        )
+                PrimaryYellowButton(
+                    text = "Verifikasi Kode OTP",
+                    onClick = { recoveryStep = 2 }
+                )
+            }
+            2 -> {
+                Text(
+                    text = "Password Baru",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = DarkText
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = newPassword,
+                    onValueChange = { newPassword = it },
+                    placeholder = { Text("Masukkan password baru...", color = DarkTextSecondary) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    leadingIcon = {
+                        Icon(Icons.Filled.Lock, contentDescription = null, tint = DarkTextSecondary)
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = DarkText,
+                        unfocusedTextColor = DarkText,
+                        cursorColor = DarkText,
+                        focusedContainerColor = LightGrayBg,
+                        unfocusedContainerColor = LightGrayBg,
+                        focusedBorderColor = PrimaryYellow,
+                        unfocusedBorderColor = Color.Transparent
+                    )
+                )
 
-        Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(28.dp))
 
-        Text(
-            text = "Try another way? Use SMS recovery",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            color = DarkTextSecondary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
+                PrimaryYellowButton(
+                    text = "Simpan Password Baru",
+                    onClick = { recoveryStep = 3 }
+                )
+            }
+            else -> {
+                PrimaryYellowButton(
+                    text = "Kembali ke Login",
+                    onClick = onLoginClick
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.weight(1f))
 

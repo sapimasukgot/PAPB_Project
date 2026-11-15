@@ -74,6 +74,13 @@ fun DiscoverScreen(
     var selectedCategory by remember { mutableStateOf("All Recipes") }
     val categories = listOf("All Recipes", "< 15 Mins", "Gluten-Free", "High Protein")
 
+    val displayedRecipes = when (selectedCategory) {
+        "< 15 Mins" -> recipes.filter { it.durationMinutes <= 15 }
+        "Gluten-Free" -> recipes.filter { it.dietaryBadges.contains("Gluten-Free") }
+        "High Protein" -> recipes.filter { it.dietaryBadges.contains("High Protein") || it.calories >= 350 }
+        else -> recipes
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -221,7 +228,7 @@ fun DiscoverScreen(
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                items(recipes.take(3)) { recipe ->
+                items(displayedRecipes.take(3)) { recipe ->
                     Box(
                         modifier = Modifier
                             .width(220.dp)
@@ -331,7 +338,7 @@ fun DiscoverScreen(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        items(recipes.drop(3)) { recipe ->
+        items(displayedRecipes.drop(3)) { recipe ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -608,8 +615,9 @@ fun FilterModalScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
+        val filteredRecipes by viewModel.filteredRecipes.collectAsState()
         PrimaryYellowButton(
-            text = "Apply Filters (Show 18 Recipes)",
+            text = "Apply Filters (Show ${filteredRecipes.size} Recipes)",
             onClick = onApplyClick
         )
     }
@@ -622,8 +630,9 @@ fun SearchResultScreen(
     onFilterClick: () -> Unit,
     onRecipeClick: (String) -> Unit
 ) {
-    val recipes by viewModel.recipes.collectAsState()
-    var searchInput by remember { mutableStateOf("Salmon") }
+    val filteredRecipes by viewModel.filteredRecipes.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    var searchInput by remember { mutableStateOf(searchQuery) }
 
     Column(
         modifier = Modifier
@@ -651,7 +660,11 @@ fun SearchResultScreen(
 
         OutlinedTextField(
             value = searchInput,
-            onValueChange = { searchInput = it },
+            onValueChange = {
+                searchInput = it
+                viewModel.setSearchQuery(it)
+            },
+            placeholder = { Text("Search by name, chef, or ingredient...", color = DarkTextSecondary) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(14.dp),
             leadingIcon = {
@@ -659,8 +672,13 @@ fun SearchResultScreen(
             },
             trailingIcon = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { searchInput = "" }) {
-                        Icon(Icons.Filled.Close, contentDescription = "Clear", tint = DarkTextSecondary)
+                    if (searchInput.isNotEmpty()) {
+                        IconButton(onClick = {
+                            searchInput = ""
+                            viewModel.setSearchQuery("")
+                        }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Clear", tint = DarkTextSecondary)
+                        }
                     }
                     IconButton(onClick = onFilterClick) {
                         Icon(Icons.Filled.Tune, contentDescription = "Filter", tint = PrimaryYellow)
@@ -686,7 +704,7 @@ fun SearchResultScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "${recipes.size} recipes found",
+                text = "${filteredRecipes.size} recipes found",
                 fontSize = 13.sp,
                 color = DarkTextSecondary
             )
@@ -700,18 +718,42 @@ fun SearchResultScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            items(recipes) { recipe ->
-                RecipeCardGrid(
-                    recipe = recipe,
-                    onClick = { onRecipeClick(recipe.id) },
-                    onBookmarkToggle = { viewModel.toggleBookmark(recipe.id) }
-                )
+        if (filteredRecipes.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "No matching recipes found",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = DarkText
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Try adjusting your multi-criteria filters or search terms.",
+                        fontSize = 13.sp,
+                        color = DarkTextSecondary
+                    )
+                }
+            }
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(filteredRecipes) { recipe ->
+                    RecipeCardGrid(
+                        recipe = recipe,
+                        onClick = { onRecipeClick(recipe.id) },
+                        onBookmarkToggle = { viewModel.toggleBookmark(recipe.id) }
+                    )
+                }
             }
         }
     }

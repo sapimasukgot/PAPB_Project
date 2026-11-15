@@ -404,6 +404,9 @@ fun GroceryDetailScreen(
 
     var newCustomItem by remember { mutableStateOf("") }
 
+    val isMetricUnit by viewModel.isMetricUnit.collectAsState()
+    val groupedItems = list.items.groupBy { it.category.ifBlank { "Pantry Essentials" } }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -522,39 +525,51 @@ fun GroceryDetailScreen(
         Spacer(modifier = Modifier.height(10.dp))
 
         LazyColumn(modifier = Modifier.weight(1f)) {
-            items(list.items) { item ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(LightGrayBg)
-                        .clickable { viewModel.toggleGroceryItemCheck(list.id, item.id) }
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Checkbox(
-                        checked = item.isChecked,
-                        onCheckedChange = { viewModel.toggleGroceryItemCheck(list.id, item.id) },
-                        colors = CheckboxDefaults.colors(
-                            checkedColor = PrimaryYellow,
-                            checkmarkColor = DarkText
-                        )
+            groupedItems.forEach { (categoryName, categoryItems) ->
+                item {
+                    Text(
+                        text = categoryName.uppercase(),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFE65100),
+                        modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = item.name,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (item.isChecked) DarkTextSecondary else DarkText,
-                            textDecoration = if (item.isChecked) TextDecoration.LineThrough else TextDecoration.None
+                }
+
+                items(categoryItems) { item ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(LightGrayBg)
+                            .clickable { viewModel.toggleGroceryItemCheck(list.id, item.id) }
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = item.isChecked,
+                            onCheckedChange = { viewModel.toggleGroceryItemCheck(list.id, item.id) },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = PrimaryYellow,
+                                checkmarkColor = Color.White
+                            )
                         )
-                        Text(
-                            text = item.category,
-                            fontSize = 11.sp,
-                            color = DarkTextSecondary
-                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = item.displayLabel(isMetric = isMetricUnit),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (item.isChecked) DarkTextSecondary else DarkText,
+                                textDecoration = if (item.isChecked) TextDecoration.LineThrough else TextDecoration.None
+                            )
+                            Text(
+                                text = item.category,
+                                fontSize = 11.sp,
+                                color = DarkTextSecondary
+                            )
+                        }
                     }
                 }
             }

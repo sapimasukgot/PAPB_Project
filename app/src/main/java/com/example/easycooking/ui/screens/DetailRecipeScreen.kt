@@ -1,5 +1,7 @@
 package com.example.easycooking.ui.screens
 
+import android.app.Activity
+import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,6 +28,7 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
@@ -46,6 +49,8 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -56,6 +61,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -359,7 +365,7 @@ fun RecipeDetailScreen(
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                text = ingredient.formattedAmount(servings / 2.0, isMetric = isMetricUnit),
+                                text = ingredient.formattedAmount(servings.toDouble() / recipe.defaultServings.toDouble(), isMetric = isMetricUnit),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = DarkText
@@ -634,11 +640,40 @@ fun CookingModeScreen(
     onBackClick: () -> Unit,
     onFinishCookingClick: () -> Unit
 ) {
+    val context = LocalContext.current
+
+    // FUNGSI 3: Keep Screen Awake via Window Flag (FLAG_KEEP_SCREEN_ON)
+    DisposableEffect(Unit) {
+        val activity = context as? Activity
+        activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose {
+            activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            viewModel.pauseTimer()
+        }
+    }
+
     val recipes by viewModel.recipes.collectAsState()
     val recipe = recipes.find { it.id == recipeId } ?: recipes.firstOrNull() ?: return
     val currentStepIndex by viewModel.currentCookingStep.collectAsState()
     val steps = recipe.steps
     val currentStep = steps.getOrNull(currentStepIndex - 1) ?: steps.lastOrNull() ?: return
+
+    // Timer States (Fungsi 3)
+    val timerSecondsLeft by viewModel.timerSecondsLeft.collectAsState()
+    val isTimerRunning by viewModel.isTimerRunning.collectAsState()
+    val isTimerDone by viewModel.isTimerDone.collectAsState()
+
+    // Inisialisasi durasi timer saat langkah pertama kali dimuat
+    LaunchedEffect(currentStep.stepNumber) {
+        viewModel.resetTimer(currentStep.durationMinutes)
+    }
+
+    // Formula Progress = currentStep / totalSteps
+    val progress = viewModel.calculateProgress(currentStepIndex, steps.size)
+
+    val timerMinutes = timerSecondsLeft / 60
+    val timerSeconds = timerSecondsLeft % 60
+    val formattedTime = String.format(java.util.Locale.US, "%02d:%02d", timerMinutes, timerSeconds)
 
     Column(
         modifier = Modifier
@@ -669,7 +704,18 @@ fun CookingModeScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            // Indikator Kemajuan Linier (Fungsi 3)
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = PrimaryYellow,
+                trackColor = LightGrayBg
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -688,7 +734,7 @@ fun CookingModeScreen(
                             text = currentStep.stepNumber.toString(),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = DarkText
+                            color = Color.White
                         )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -704,14 +750,14 @@ fun CookingModeScreen(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFFFEF3C7))
+                            .background(Color(0xFFFFE0B2))
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
                             text = "Final Step",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFB45309)
+                            color = Color(0xFFE65100)
                         )
                     }
                 }
@@ -734,7 +780,7 @@ fun CookingModeScreen(
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
                     Text(
-                        text = "Ready to Serve",
+                        text = if (isTimerDone) "Step Complete!" else "Keep Screen Awake Active",
                         fontSize = 11.sp,
                         color = PrimaryYellow,
                         fontWeight = FontWeight.SemiBold
@@ -784,7 +830,7 @@ fun CookingModeScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFFFFFBEB))
+                        .background(Color(0xFFFFF3E0))
                         .padding(14.dp)
                 ) {
                     Column {
@@ -792,13 +838,13 @@ fun CookingModeScreen(
                             text = "Chef's Pro Tip",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFB45309)
+                            color = Color(0xFFE65100)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = currentStep.tip,
                             fontSize = 12.sp,
-                            color = Color(0xFF78350F)
+                            color = Color(0xFFBF360C)
                         )
                     }
                 }
@@ -806,31 +852,56 @@ fun CookingModeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Widget Countdown Timer Interaktif (Fungsi 3)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(LightGrayBg)
+                    .background(if (isTimerDone) Color(0xFFE8F5E9) else LightGrayBg)
                     .padding(horizontal = 14.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Check, contentDescription = null, tint = PrimaryYellow, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "00:00 | Completed",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = DarkText
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { viewModel.startStepTimer(currentStep.durationMinutes) }
+                ) {
+                    Icon(
+                        imageVector = when {
+                            isTimerDone -> Icons.Filled.Check
+                            isTimerRunning -> Icons.Filled.Pause
+                            else -> Icons.Filled.PlayArrow
+                        },
+                        contentDescription = "Timer Toggle",
+                        tint = if (isTimerDone) Color(0xFF2E7D32) else PrimaryYellow,
+                        modifier = Modifier.size(22.dp)
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = if (isTimerDone) "Done!" else formattedTime,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isTimerDone) Color(0xFF2E7D32) else DarkText
+                        )
+                        Text(
+                            text = when {
+                                isTimerDone -> "Cooking stage finished"
+                                isTimerRunning -> "Timer running (tap to pause)"
+                                else -> "Tap to start countdown"
+                            },
+                            fontSize = 11.sp,
+                            color = DarkTextSecondary
+                        )
+                    }
                 }
 
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(Color.White)
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                        .clickable { viewModel.addExtraMinute() }
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
                     Text("+1 min", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DarkText)
                 }
@@ -856,7 +927,9 @@ fun CookingModeScreen(
                     color = if (currentStepIndex > 1) DarkText else Color.LightGray,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.clickable(enabled = currentStepIndex > 1) {
-                        viewModel.setCookingStep(currentStepIndex - 1)
+                        val prev = currentStepIndex - 1
+                        val prevDuration = steps.getOrNull(prev - 1)?.durationMinutes ?: 5
+                        viewModel.setCookingStep(prev, prevDuration)
                     }
                 )
 
@@ -873,7 +946,9 @@ fun CookingModeScreen(
                     color = if (currentStepIndex < steps.size) DarkText else Color.LightGray,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.clickable(enabled = currentStepIndex < steps.size) {
-                        viewModel.setCookingStep(currentStepIndex + 1)
+                        val next = currentStepIndex + 1
+                        val nextDuration = steps.getOrNull(next - 1)?.durationMinutes ?: 5
+                        viewModel.setCookingStep(next, nextDuration)
                     }
                 )
             }
