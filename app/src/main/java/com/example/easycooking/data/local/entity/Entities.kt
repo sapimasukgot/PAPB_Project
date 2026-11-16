@@ -15,8 +15,8 @@ data class RecipeEntity(
     val reviewCount: Int,
     val isBookmarked: Boolean,
     val category: String,
-    val dietaryBadgesRaw: String, // comma separated
-    val allergensRaw: String,      // comma separated
+    val dietaryBadgesRaw: String,
+    val allergensRaw: String,
     val defaultServings: Int = 2
 )
 

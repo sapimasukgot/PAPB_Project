@@ -31,22 +31,18 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
     private val _currentTab = MutableStateFlow(BottomTab.DISCOVER)
     val currentTab: StateFlow<BottomTab> = _currentTab.asStateFlow()
 
-    // 1. DATA MASTER RECIPES DARI ROOM DATABASE
     val recipes: StateFlow<List<Recipe>> = repository.getAllRecipes()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // 2. DATA DAFTAR BELANJA DARI ROOM DATABASE
     val groceryLists: StateFlow<List<GroceryList>> = repository.getGroceryLists()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // 3. FILTER & SEARCH QUERY STATE
     private val _filterState = MutableStateFlow(FilterState())
     val filterState: StateFlow<FilterState> = _filterState.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    // 4. PREFERENSI ALERGEN & DIET (DATASTORE BACKED)
     val selectedAllergens: StateFlow<Set<String>> = repository.preferencesManager.selectedAllergensFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), setOf("Peanuts", "Tree Nuts"))
 
@@ -59,11 +55,9 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
     val isMetricUnit: StateFlow<Boolean> = repository.preferencesManager.isMetricUnitFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
-    // 5. PORSI DINAMIS (FUNGSI 2) - Validasi 1 s.d 50 sajian
     private val _servingsCount = MutableStateFlow(2)
     val servingsCount: StateFlow<Int> = _servingsCount.asStateFlow()
 
-    // 6. COOKING MODE & TIMER TERINTEGRASI (FUNGSI 3)
     private val _currentCookingStep = MutableStateFlow(1)
     val currentCookingStep: StateFlow<Int> = _currentCookingStep.asStateFlow()
 
@@ -78,7 +72,6 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
 
     private var timerJob: Job? = null
 
-    // 7. NEW RECIPE CREATOR STATE
     private val _newRecipeTitle = MutableStateFlow("Creamy Tuscan Garlic Chicken")
     val newRecipeTitle: StateFlow<String> = _newRecipeTitle.asStateFlow()
 
@@ -97,14 +90,6 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
     )
     val newRecipeIngredients: StateFlow<List<String>> = _newRecipeIngredients.asStateFlow()
 
-    /**
-     * FUNGSI 1: Sistem Penyaringan Cerdas Multi-Kriteria & Strict Allergen Engine
-     * Mengolah query relasional secara berkelanjutan pada Dispatchers.Default mencakup:
-     * - Rentang waktu memasak (<15m, 15-30m, 30-60m, 1h+)
-     * - Kategori waktu makan (Breakfast, Lunch, Dinner, Snack)
-     * - Pola diet (Gluten-Free, Dairy-Free, Vegetarian, dll.)
-     * - Strict Allergen Filter: eliminasi otomatis jika recipe.allergens.intersect(user.allergens).isNotEmpty()
-     */
     val filteredRecipes: StateFlow<List<Recipe>> = combine(
         recipes,
         filterState,
@@ -113,12 +98,10 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
         strictAllergenFilter
     ) { rList, filter, query, userAllergens, strictFilter ->
         rList.filter { recipe ->
-            // A. Strict Allergen Safety Engine
             val isAllergenSafe = if (strictFilter && userAllergens.isNotEmpty()) {
                 recipe.allergens.none { it in userAllergens }
             } else true
 
-            // B. Filter Rentang Waktu Masak
             val matchesDuration = when (filter.selectedDuration) {
                 "< 15m", "< 15 Mins" -> recipe.durationMinutes < 15
                 "15-30m" -> recipe.durationMinutes in 15..30
@@ -127,17 +110,14 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
                 else -> true
             }
 
-            // C. Filter Kategori Waktu Makan
             val matchesMealType = if (filter.selectedMealType.isNotBlank() && filter.selectedMealType != "All") {
                 recipe.category.equals(filter.selectedMealType, ignoreCase = true)
             } else true
 
-            // D. Filter Gaya Hidup Diet
             val matchesDietary = if (filter.selectedDietary.isNotEmpty()) {
                 filter.selectedDietary.any { badge -> recipe.dietaryBadges.contains(badge) }
             } else true
 
-            // E. Pencarian Kata Kunci Teks Bebas
             val matchesQuery = if (query.isNotBlank()) {
                 recipe.title.contains(query, ignoreCase = true) ||
                         recipe.chefName.contains(query, ignoreCase = true) ||
@@ -171,7 +151,6 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // FUNGSI 2: Penyesuaian Porsi Dinamis (Batas 1 s.d 50 porsi)
     fun incrementServings() {
         _servingsCount.update { if (it < 50) it + 1 else 50 }
     }
@@ -186,7 +165,6 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // FUNGSI 3: Cooking Mode & Countdown Timer per Detik
     fun setCookingStep(step: Int, initialMinutes: Int = 5) {
         _currentCookingStep.value = step
         resetTimer(initialMinutes)
@@ -248,7 +226,6 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
         return if (totalSteps > 0) currentStep.toFloat() / totalSteps.toFloat() else 0f
     }
 
-    // FUNGSI 4: Agregasi Otomatis Bahan ke Daftar Belanja
     fun exportRecipeToGrocery(recipe: Recipe) {
         viewModelScope.launch {
             repository.exportRecipeToGrocery(recipe, _servingsCount.value)
@@ -276,7 +253,6 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Filter Controls
     fun toggleDietaryLifestyle(lifestyle: String) {
         viewModelScope.launch {
             val current = selectedDietaryLifestyles.value
@@ -319,7 +295,6 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
         _filterState.value = FilterState()
     }
 
-    // Creator View
     fun updateNewRecipeTitle(title: String) {
         _newRecipeTitle.value = title
     }

@@ -642,7 +642,6 @@ fun CookingModeScreen(
 ) {
     val context = LocalContext.current
 
-    // FUNGSI 3: Keep Screen Awake via Window Flag (FLAG_KEEP_SCREEN_ON)
     DisposableEffect(Unit) {
         val activity = context as? Activity
         activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -658,17 +657,14 @@ fun CookingModeScreen(
     val steps = recipe.steps
     val currentStep = steps.getOrNull(currentStepIndex - 1) ?: steps.lastOrNull() ?: return
 
-    // Timer States (Fungsi 3)
     val timerSecondsLeft by viewModel.timerSecondsLeft.collectAsState()
     val isTimerRunning by viewModel.isTimerRunning.collectAsState()
     val isTimerDone by viewModel.isTimerDone.collectAsState()
 
-    // Inisialisasi durasi timer saat langkah pertama kali dimuat
     LaunchedEffect(currentStep.stepNumber) {
         viewModel.resetTimer(currentStep.durationMinutes)
     }
 
-    // Formula Progress = currentStep / totalSteps
     val progress = viewModel.calculateProgress(currentStepIndex, steps.size)
 
     val timerMinutes = timerSecondsLeft / 60
@@ -704,7 +700,6 @@ fun CookingModeScreen(
                 }
             }
 
-            // Indikator Kemajuan Linier (Fungsi 3)
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
@@ -852,7 +847,6 @@ fun CookingModeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Widget Countdown Timer Interaktif (Fungsi 3)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

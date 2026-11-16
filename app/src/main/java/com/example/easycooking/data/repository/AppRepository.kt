@@ -29,11 +29,9 @@ class AppRepository(
     private val groceryDao = database.groceryDao()
     val preferencesManager = PreferencesManager(context)
 
-    // In-memory detailed cache for rich UI objects (steps, ingredients, reviews)
     private val inMemoryRecipes = mutableMapOf<String, Recipe>()
 
     init {
-        // Pre-populate seed data
         val defaultIngredients = listOf(
             Ingredient("1", "Chicken breast", "tender diced fillets", 400.0, "g", "Produce & Meat", allergenTags = emptyList()),
             Ingredient("2", "Garlic", "finely minced", 3.0, "cloves", "Produce & Meat", allergenTags = emptyList()),
@@ -187,7 +185,6 @@ class AppRepository(
         }
         recipeDao.insertAll(entities)
 
-        // Seed initial grocery lists in Room if not exist
         val initialLists = listOf(
             GroceryListEntity("g1", "Tuscan Garlic Chicken", "Updated 2h ago", isCompleted = false),
             GroceryListEntity("g2", "Berry Blast Smoothie", "Updated 5h ago", isCompleted = false),
@@ -292,13 +289,6 @@ class AppRepository(
         groceryDao.insertItems(listOf(newItem))
     }
 
-    /**
-     * FUNGSI 4: Sistem Agregasi Otomatis Bahan Resep ke Daftar Belanja Terkategori
-     * Menerapkan evaluasi duplikasi bahan lintas resep:
-     * - Jika bahan sama & satuan identik: dijumlahkan totalQuantity = existingQuantity + newQuantity
-     * - Jika bahan sama & satuan sejenis (misal kg dan g): disetarakan ke satuan gram sebelum dijumlahkan
-     * - Jika satuan tidak kompatibel: disimpan sebagai baris terpisah dalam kategori yang sama.
-     */
     suspend fun exportRecipeToGrocery(
         recipe: Recipe,
         targetServings: Int

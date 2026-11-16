@@ -2,14 +2,12 @@ package com.example.easycooking.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Tabel 2.2 Token Warna Desain Antarmuka EasyCooking
-val PrimaryColor = Color(0xFFE65100)      // Deep Orange (Warna aksen utama)
-val SecondaryAccent = Color(0xFFFF7043)   // Coral Orange (Warna sekunder / badge / progress)
-val BackgroundSurface = Color(0xFFFAFAFA) // Latar belakang antarmuka
-val TextPrimary = Color(0xFF1A1A1A)       // Near Black (WCAG AAA)
-val SuccessStatus = Color(0xFF2E7D32)     // Dark Green (Checklist selesai, timer done)
+val PrimaryColor = Color(0xFFE65100)
+val SecondaryAccent = Color(0xFFFF7043)
+val BackgroundSurface = Color(0xFFFAFAFA)
+val TextPrimary = Color(0xFF1A1A1A)
+val SuccessStatus = Color(0xFF2E7D32)
 
-// Backward compatibility aliases
 val PrimaryYellow = PrimaryColor
 val PrimaryOrange = SecondaryAccent
 val DarkText = TextPrimary

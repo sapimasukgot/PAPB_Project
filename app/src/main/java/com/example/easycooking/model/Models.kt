@@ -19,45 +19,36 @@ data class Ingredient(
     val isChecked: Boolean = false,
     val allergenTags: List<String> = emptyList()
 ) {
-    /**
-     * Menerapkan Aturan Pembulatan Cerdas (Tabel 2.3) dan
-     * Matriks Rumus Konversi Satuan Metrik dan Imperial Eksak (Tabel 2.4).
-     */
     fun formattedAmount(servingsMultiplier: Double, isMetric: Boolean = true): String {
         val total = baseAmount * servingsMultiplier
         val unitLower = unit.lowercase().trim()
 
-        // 1. Cek Kategori Bahan Berdasarkan Satuan
         return when {
-            // Rempah & Bumbu Sendok (Tabel 2.3)
             unitLower in listOf("sdm", "sdt", "tbsp", "tsp", "tablespoon", "teaspoon") -> {
                 val formattedFraction = formatToKitchenFraction(total)
                 "$formattedFraction $unit".trim()
             }
 
-            // Bahan Diskrit / Butiran (Tabel 2.3: butir, siung, lembar, buah, cloves)
             unitLower in listOf("butir", "siung", "lembar", "buah", "clove", "cloves", "pcs", "piece", "pieces") -> {
                 val discreteCount = maxOf(1, total.roundToInt())
                 "$discreteCount $unit".trim()
             }
 
-            // Bahan Kontinu Massa & Volume (Cair & Bubuk)
             else -> {
                 if (isMetric) {
                     formatContinuousAmount(total, unit)
                 } else {
-                    // Konversi Satuan Metrik ke Imperial Eksak (Tabel 2.4)
                     when (unitLower) {
                         "g", "gram", "grams" -> {
-                            val oz = total / 28.3495 // Tabel 2.4: Ounce = Gram / 28.3495
+                            val oz = total / 28.3495
                             formatContinuousAmount(oz, "oz")
                         }
                         "ml", "mililiter" -> {
-                            val flOz = total / 29.5735 // Tabel 2.4: Fluid Ounce = Mililiter / 29.5735
+                            val flOz = total / 29.5735
                             formatContinuousAmount(flOz, "fl oz")
                         }
                         "kg", "kilogram" -> {
-                            val lbs = total * 2.20462 // Tabel 2.4: Pound = Kilogram * 2.20462
+                            val lbs = total * 2.20462
                             formatContinuousAmount(lbs, "lb")
                         }
                         else -> formatContinuousAmount(total, unit)
@@ -69,11 +60,9 @@ data class Ingredient(
 
     private fun formatContinuousAmount(amount: Double, displayUnit: String): String {
         val roundedInt = amount.roundToInt()
-        // Pembulatan ke bilangan bulat jika selisih < 0.05
         return if (abs(amount - roundedInt) < 0.05) {
             "$roundedInt $displayUnit".trim()
         } else {
-            // Dibulatkan ke 1 tempat desimal jika pecahan
             String.format(java.util.Locale.US, "%.1f %s", amount, displayUnit).trim()
         }
     }
@@ -97,7 +86,6 @@ data class Ingredient(
                 if (remainder >= 0.875) "${whole + 1}" else "$whole"
             }
             else -> {
-                // Sangat kecil namun > 0, gunakan 1/4 sebagai batas minimal takaran bumbu
                 "1/4"
             }
         }
