@@ -211,7 +211,7 @@ fun SavedScreen(
                 val filteredRecipes = when (selectedCategory) {
                     "All" -> savedRecipes
                     "Quick Dinners" -> savedRecipes.filter { it.category.contains("Dinner", ignoreCase = true) || it.durationMinutes <= 30 }
-                    else -> savedRecipes.filter { it.category.equals(selectedCategory, ignoreCase = true) }
+                    else -> savedRecipes.filter { it.category.contains(selectedCategory.trimEnd('s'), ignoreCase = true) }
                 }
                 val chunkedList = filteredRecipes.chunked(2)
 

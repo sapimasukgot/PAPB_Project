@@ -906,6 +906,256 @@ class AppRepository(
                     ReviewItem("r26_1", "Vanessa R.", 5, "2d ago", "The salty feta with wilted spinach is a classic breakfast match! Fluffy and rich."),
                     ReviewItem("r26_2", "Gregory P.", 5, "4d ago", "Takes 10 minutes and keeps me fueled throughout entire morning.")
                 )
+            ),
+            Recipe(
+                id = "27",
+                title = "Fluffy Buttermilk Pancakes",
+                chefName = "Chef Maria",
+                difficulty = "Easy",
+                durationMinutes = 15,
+                calories = 350,
+                rating = 4.9,
+                reviewCount = 210,
+                isBookmarked = false,
+                category = "Breakfast",
+                dietaryBadges = listOf("Vegetarian", "Nut-Free"),
+                allergens = listOf("Gluten", "Dairy", "Eggs"),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("27_1", "All-purpose flour", "unbleached flour", 200.0, "g", "Pantry Essentials", listOf("Gluten")),
+                    ing("27_2", "Fresh buttermilk", "cultured buttermilk", 250.0, "ml", "Dairy & Eggs", listOf("Dairy")),
+                    ing("27_3", "Large egg", "fresh free-range egg", 1.0, "pcs", "Dairy & Eggs", listOf("Eggs")),
+                    ing("27_4", "Melted butter", "unsalted butter", 2.0, "tbsp", "Dairy & Eggs", listOf("Dairy")),
+                    ing("27_5", "Pure maple syrup", "grade A dark maple", 2.0, "tbsp", "Pantry Essentials", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Whisk Batter", "Whisk dry ingredients, then fold in buttermilk, egg, and melted butter gently.", 4, false, "Do not overmix; small lumps make the pancakes extra fluffy."),
+                    RecipeStep(2, "Griddle Cooking", "Ladle 1/4 cup batter onto a buttered non-stick skillet over medium heat.", 4, false, "Flip when small bubbles pop on surface and edges look set."),
+                    RecipeStep(3, "Stack & Drizzle", "Cook 2 minutes on second side until golden brown, stack high and top with maple syrup.", 2, true, "Serve steaming hot with extra whipped butter.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r27_1", "Lucas M.", 5, "1d ago", "The fluffiest pancakes I've ever made at home! Kids loved them."),
+                    ReviewItem("r27_2", "Chloe R.", 5, "3d ago", "Pure weekend brunch perfection.")
+                )
+            ),
+            Recipe(
+                id = "28",
+                title = "Classic Shakshuka with Feta",
+                chefName = "Chef Alex",
+                difficulty = "Easy",
+                durationMinutes = 20,
+                calories = 290,
+                rating = 4.8,
+                reviewCount = 165,
+                isBookmarked = false,
+                category = "Breakfast",
+                dietaryBadges = listOf("Vegetarian", "Gluten-Free", "Low Carb"),
+                allergens = listOf("Eggs", "Dairy"),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("28_1", "Large eggs", "fresh eggs", 3.0, "pcs", "Dairy & Eggs", listOf("Eggs")),
+                    ing("28_2", "Crushed tomatoes", "Italian canned tomatoes", 300.0, "g", "Pantry Essentials", emptyList()),
+                    ing("28_3", "Bell pepper", "diced red bell pepper", 1.0, "pcs", "Produce & Meat", emptyList()),
+                    ing("28_4", "Crumbled feta", "Greek feta cheese", 40.0, "g", "Dairy & Eggs", listOf("Dairy")),
+                    ing("28_5", "Olive oil", "extra virgin", 1.0, "tbsp", "Pantry Essentials", emptyList()),
+                    ing("28_6", "Ground cumin & paprika", "warm spice mix", 1.0, "tbsp", "Pantry Essentials", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Simmer Tomato Sauce", "Saute diced peppers in olive oil with cumin and paprika, then simmer crushed tomatoes for 8 minutes.", 8, false, "Simmer until sauce thickens so eggs sit nicely on top."),
+                    RecipeStep(2, "Poach Eggs", "Make 3 wells in sauce, crack whole eggs inside, cover with lid on low heat for 6 minutes.", 6, false, "Keep whites firm while yolks stay deliciously runny."),
+                    RecipeStep(3, "Garnish & Serve", "Sprinkle crumbled feta and freshly chopped cilantro over skillet.", 2, true, "Serve directly from skillet with warm bread.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r28_1", "Daniel S.", 5, "2d ago", "Bursting with smoky spiced tomato flavor! Perfect savory breakfast."),
+                    ReviewItem("r28_2", "Nadia B.", 5, "5d ago", "The runny yolks mixed into the feta tomato sauce is absolute heaven.")
+                )
+            ),
+            Recipe(
+                id = "29",
+                title = "Avocado Toast with Poached Egg",
+                chefName = "Chef Alex",
+                difficulty = "Easy",
+                durationMinutes = 10,
+                calories = 270,
+                rating = 4.9,
+                reviewCount = 230,
+                isBookmarked = false,
+                category = "Breakfast",
+                dietaryBadges = listOf("Vegetarian", "Dairy-Free", "Nut-Free"),
+                allergens = listOf("Gluten", "Eggs"),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("29_1", "Sourdough bread", "artisan sourdough slices", 2.0, "pcs", "Pantry Essentials", listOf("Gluten")),
+                    ing("29_2", "Ripe avocado", "creamy ripe Haas avocado", 1.0, "pcs", "Produce & Meat", emptyList()),
+                    ing("29_3", "Fresh eggs", "large fresh eggs", 2.0, "pcs", "Dairy & Eggs", listOf("Eggs")),
+                    ing("29_4", "Red pepper flakes", "crushed chili flakes", 1.0, "tsp", "Pantry Essentials", emptyList()),
+                    ing("29_5", "Lemon juice", "freshly squeezed", 1.0, "tsp", "Produce & Meat", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Toast Sourdough", "Toast artisan sourdough slices until deeply golden and crunchy on both sides.", 3, false, "Thick crunchy toast supports the creamy avocado without sogginess."),
+                    RecipeStep(2, "Mash Avocado", "Mash ripe avocado with fresh lemon juice, sea salt, and black pepper in a small bowl.", 2, false, "Leave small chunks for delightful textural contrast."),
+                    RecipeStep(3, "Poach Egg & Assemble", "Gently poach eggs in simmering vinegar water for 3 minutes, slide on top of avocado toast, and sprinkle chili flakes.", 4, true, "A dash of vinegar in water keeps egg whites tidy while poaching.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r29_1", "Sarah P.", 5, "1d ago", "Cafe-quality avocado toast at home in under 10 minutes!"),
+                    ReviewItem("r29_2", "Ryan K.", 5, "4d ago", "The golden runny yolk over rich avocado is unbeatable.")
+                )
+            ),
+            Recipe(
+                id = "30",
+                title = "Apple Cinnamon Overnight Oats",
+                chefName = "Chef Alex",
+                difficulty = "Easy",
+                durationMinutes = 5,
+                calories = 240,
+                rating = 4.8,
+                reviewCount = 140,
+                isBookmarked = false,
+                category = "Breakfast",
+                dietaryBadges = listOf("Vegan", "Vegetarian", "Gluten-Free", "Dairy-Free"),
+                allergens = emptyList(),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("30_1", "Rolled oats", "gluten-free rolled oats", 60.0, "g", "Pantry Essentials", emptyList()),
+                    ing("30_2", "Almond milk", "unsweetened almond milk", 150.0, "ml", "Specialty", emptyList()),
+                    ing("30_3", "Honeycrisp apple", "finely diced sweet apple", 1.0, "pcs", "Produce & Meat", emptyList()),
+                    ing("30_4", "Ground cinnamon", "fragrant Ceylon cinnamon", 1.0, "tsp", "Pantry Essentials", emptyList()),
+                    ing("30_5", "Pure maple syrup", "dark maple syrup", 1.0, "tbsp", "Pantry Essentials", emptyList()),
+                    ing("30_6", "Chia seeds", "black chia seeds", 1.0, "tbsp", "Pantry Essentials", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Combine Oats & Milk", "In a mason jar, combine rolled oats, chia seeds, cinnamon, and chilled almond milk.", 2, false, "Chia seeds absorb liquid giving the oats an ultra-creamy consistency."),
+                    RecipeStep(2, "Add Apples & Maple", "Stir in freshly diced sweet apples and pure maple syrup until well distributed.", 2, false, "Diced apples retain their crisp bite overnight."),
+                    RecipeStep(3, "Chill Overnight", "Seal jar and refrigerate overnight. Enjoy chilled straight from jar or gently warmed.", 1, true, "Effortless grab-and-go morning fuel packed with whole grains.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r30_1", "Emma W.", 5, "2d ago", "Tastes like healthy apple pie in a jar! Saves me so much time before work."),
+                    ReviewItem("r30_2", "Brian L.", 5, "6d ago", "Creamy, naturally sweet, and very satisfying.")
+                )
+            ),
+            Recipe(
+                id = "31",
+                title = "Molten Chocolate Lava Cake",
+                chefName = "Chef Elena Vance",
+                difficulty = "Medium",
+                durationMinutes = 20,
+                calories = 380,
+                rating = 5.0,
+                reviewCount = 310,
+                isBookmarked = false,
+                category = "Dessert",
+                dietaryBadges = listOf("Vegetarian", "Nut-Free"),
+                allergens = listOf("Gluten", "Dairy", "Eggs"),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("31_1", "Dark chocolate", "70% bittersweet chocolate", 120.0, "g", "Specialty", listOf("Dairy")),
+                    ing("31_2", "Unsalted butter", "pure creamy butter", 60.0, "g", "Dairy & Eggs", listOf("Dairy")),
+                    ing("31_3", "Large eggs", "whole eggs", 2.0, "pcs", "Dairy & Eggs", listOf("Eggs")),
+                    ing("31_4", "Powdered sugar", "confectioners sugar", 40.0, "g", "Pantry Essentials", emptyList()),
+                    ing("31_5", "All-purpose flour", "fine pastry flour", 30.0, "g", "Pantry Essentials", listOf("Gluten"))
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Melt Chocolate & Butter", "Gently melt dark chocolate and butter cubes in a heatproof bowl over simmering water until glossy smooth.", 4, false, "Do not let water touch bottom of bowl to prevent chocolate from seizing."),
+                    RecipeStep(2, "Whisk Batter", "Whisk eggs and sugar until pale and fluffy, fold in melted chocolate, and sift flour gently.", 4, false, "Gentle folding keeps the cake light with a molten center."),
+                    RecipeStep(3, "Bake Lava Center", "Bake in buttered ramekins at 220C for exactly 11 minutes until edges are set but center jiggles gently.", 11, true, "Invert immediately onto plate and dust with powdered sugar.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r31_1", "Isabella M.", 5, "1d ago", "Rich, gooey chocolate river poured out of the center! Absolute showstopper dessert."),
+                    ReviewItem("r31_2", "David T.", 5, "3d ago", "Followed the 11-minute timer and the lava center was flawless.")
+                )
+            ),
+            Recipe(
+                id = "32",
+                title = "Classic Italian Tiramisu",
+                chefName = "Chef Marco",
+                difficulty = "Medium",
+                durationMinutes = 15,
+                calories = 320,
+                rating = 4.9,
+                reviewCount = 275,
+                isBookmarked = false,
+                category = "Dessert",
+                dietaryBadges = listOf("Vegetarian", "Nut-Free"),
+                allergens = listOf("Gluten", "Dairy", "Eggs"),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("32_1", "Ladyfinger biscuits", "savoiardi biscuits", 150.0, "g", "Pantry Essentials", listOf("Gluten", "Eggs")),
+                    ing("32_2", "Mascarpone cheese", "rich Italian mascarpone", 250.0, "g", "Dairy & Eggs", listOf("Dairy")),
+                    ing("32_3", "Espresso coffee", "chilled fresh espresso", 150.0, "ml", "Specialty", emptyList()),
+                    ing("32_4", "Heavy whipping cream", "cold cream", 120.0, "ml", "Dairy & Eggs", listOf("Dairy")),
+                    ing("32_5", "Cocoa powder", "dutch processed dark cocoa", 2.0, "tbsp", "Specialty", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Whip Mascarpone Cream", "Whip cold mascarpone with heavy cream and sugar until stiff velvety peaks form.", 5, false, "Cold ingredients ensure the cream whips firmly without separating."),
+                    RecipeStep(2, "Dip Ladyfingers", "Quickly dip ladyfingers into cooled espresso for 1 second per side and arrange in dish.", 4, false, "A quick dip prevents ladyfingers from turning soggy."),
+                    RecipeStep(3, "Layer & Dust Cocoa", "Spread half the mascarpone cream, repeat with second layer of biscuits, and dust generously with dark cocoa powder.", 4, true, "Chill 2 hours before slicing for clean, elegant layers.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r32_1", "Marco B.", 5, "2d ago", "Tastes like authentic Roman trattoria tiramisu! Heavenly texture."),
+                    ReviewItem("r32_2", "Clara K.", 5, "5d ago", "So easy to assemble and everyone asked for seconds.")
+                )
+            ),
+            Recipe(
+                id = "33",
+                title = "Warm Berry Crisp",
+                chefName = "Chef Alex",
+                difficulty = "Easy",
+                durationMinutes = 30,
+                calories = 260,
+                rating = 4.8,
+                reviewCount = 160,
+                isBookmarked = false,
+                category = "Dessert",
+                dietaryBadges = listOf("Vegan", "Vegetarian", "Gluten-Free", "Dairy-Free"),
+                allergens = emptyList(),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("33_1", "Mixed berries", "fresh or frozen berries", 300.0, "g", "Produce & Meat", emptyList()),
+                    ing("33_2", "Rolled oats", "gluten-free rolled oats", 80.0, "g", "Pantry Essentials", emptyList()),
+                    ing("33_3", "Coconut oil", "melted virgin coconut oil", 2.0, "tbsp", "Pantry Essentials", emptyList()),
+                    ing("33_4", "Pure maple syrup", "amber maple syrup", 3.0, "tbsp", "Pantry Essentials", emptyList()),
+                    ing("33_5", "Tapioca starch", "pure tapioca starch", 1.0, "tbsp", "Pantry Essentials", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Toss Berry Base", "Toss mixed berries with 1 tbsp maple syrup and tapioca starch in baking dish.", 3, false, "Tapioca starch thickens juicy berry juices into a rich compote."),
+                    RecipeStep(2, "Mix Oat Crisp", "Mix rolled oats, cinnamon, melted coconut oil, and remaining maple syrup until crumbly.", 3, false, "Rub mixture with fingers to create golden crispy oat clusters."),
+                    RecipeStep(3, "Bake Golden Brown", "Scatter oat topping over berries and bake at 180C for 22 minutes until bubbling and crisp.", 22, true, "Delicious served warm with dairy-free vanilla bean ice cream.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r33_1", "Hannah G.", 5, "1d ago", "Warm, jammy berries with crunchy sweet oat topping. Super comforting!"),
+                    ReviewItem("r33_2", "Samuel V.", 5, "4d ago", "Love that it is naturally sweetened and gluten-free. Will make often.")
+                )
+            ),
+            Recipe(
+                id = "34",
+                title = "Mango Chia Coconut Parfait",
+                chefName = "Chef Alex",
+                difficulty = "Easy",
+                durationMinutes = 10,
+                calories = 190,
+                rating = 4.9,
+                reviewCount = 115,
+                isBookmarked = false,
+                category = "Dessert",
+                dietaryBadges = listOf("Vegan", "Vegetarian", "Gluten-Free", "Dairy-Free", "Nut-Free"),
+                allergens = emptyList(),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("34_1", "Fresh mango puree", "ripe sweet mango puree", 150.0, "g", "Produce & Meat", emptyList()),
+                    ing("34_2", "Coconut milk", "full fat creamy coconut milk", 150.0, "ml", "Specialty", emptyList()),
+                    ing("34_3", "Black chia seeds", "raw chia seeds", 3.0, "tbsp", "Pantry Essentials", emptyList()),
+                    ing("34_4", "Toasted coconut shreds", "golden toasted coconut", 20.0, "g", "Specialty", emptyList()),
+                    ing("34_5", "Fresh mint", "fresh fragrant sprigs", 4.0, "pcs", "Produce & Meat", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Prepare Chia Cream", "Whisk chia seeds and coconut milk with a hint of vanilla until thick and creamy.", 3, false, "Coconut milk creates a rich custard-like dessert pudding."),
+                    RecipeStep(2, "Puree Ripe Mango", "Blend sweet ripe mango flesh until silky smooth and brightly golden.", 3, false, "Use naturally sweet mangoes so no added sugar is needed."),
+                    RecipeStep(3, "Layer & Garnish", "Alternate layers of coconut chia pudding and vibrant mango puree in glasses, topping with toasted coconut shreds and mint.", 3, true, "Light, guilt-free tropical dessert.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r34_1", "Lily A.", 5, "3d ago", "So light, refreshing, and beautifully layered! Perfect summer dessert."),
+                    ReviewItem("r34_2", "George K.", 5, "1w ago", "Creamy coconut and sweet mango are a match made in paradise.")
+                )
             )
         )
     }

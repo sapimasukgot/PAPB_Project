@@ -86,6 +86,9 @@ fun AccountScreen(
     val loggedInName by viewModel.loggedInName.collectAsState()
     val loggedInEmail by viewModel.loggedInEmail.collectAsState()
     val allRecipes by viewModel.recipes.collectAsState()
+    val myPublishedRecipes = allRecipes.filter {
+        it.chefName.equals(loggedInName, ignoreCase = true) || it.id.startsWith("user_rec_")
+    }
     var showAuthDialog by remember { mutableStateOf(false) }
     var authDialogReason by remember { mutableStateOf("") }
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
@@ -342,7 +345,7 @@ fun AccountScreen(
                     AccountMenuItem(
                         title = "Switch to Creator View",
                         subtitle = "View published recipes & analytics",
-                        trailingBadge = "Pro Mode",
+                        trailingBadge = "Creator",
                         onClick = {
                             if (isLoggedIn) {
                                 isCreatorMode = true
@@ -394,7 +397,7 @@ fun AccountScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "Savor Kitchen Companion | v2.4.0 (Guest)",
+                    text = "Savor Kitchen Companion | v2.4.0 (${if (isLoggedIn) "Registered User" else "Guest"})",
                     fontSize = 11.sp,
                     color = DarkTextSecondary,
                     textAlign = TextAlign.Center,
@@ -426,7 +429,7 @@ fun AccountScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("Chef Elena Vance", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                                    Text(loggedInName.ifBlank { "Creator" }, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkText)
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Box(
                                         modifier = Modifier
@@ -434,13 +437,17 @@ fun AccountScreen(
                                             .background(PrimaryYellow)
                                             .padding(horizontal = 6.dp, vertical = 2.dp)
                                     ) {
-                                        Text("Pro", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                                        Text("Creator", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = DarkText)
                                     }
                                 }
-                                Text("5 Published | 1.4k Total Cooks", fontSize = 12.sp, color = DarkTextSecondary)
+                                Text("${myPublishedRecipes.size} Published", fontSize = 12.sp, color = DarkTextSecondary)
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("4.9", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                                val avgRating = if (myPublishedRecipes.isNotEmpty()) {
+                                    val avg = myPublishedRecipes.map { it.rating }.average()
+                                    Math.round(avg * 10.0) / 10.0
+                                } else 5.0
+                                Text(avgRating.toString(), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DarkText)
                                 Icon(Icons.Filled.Star, contentDescription = null, tint = StarYellow, modifier = Modifier.size(16.dp))
                             }
                         }
@@ -448,7 +455,7 @@ fun AccountScreen(
                         Spacer(modifier = Modifier.height(10.dp))
 
                         Text(
-                            text = "Switch to Guest View",
+                            text = "Exit Creator Mode",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color(0xFFB45309),
@@ -459,10 +466,6 @@ fun AccountScreen(
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            val myPublishedRecipes = allRecipes.filter {
-                it.chefName.equals(loggedInName, ignoreCase = true) || it.id.startsWith("user_rec_")
             }
 
             item {

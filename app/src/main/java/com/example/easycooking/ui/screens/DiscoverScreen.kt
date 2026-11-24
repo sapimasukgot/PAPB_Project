@@ -492,7 +492,7 @@ fun FilterModalScreen(
 
     val durations = listOf("< 15m", "15-30m", "30-60m", "1h+")
     val dietaries = listOf("Gluten-Free", "Dairy-Free", "Nut-Free", "Shellfish-Free", "Vegetarian")
-    val mealTypes = listOf("Breakfast", "Lunch", "Dinner", "Snack")
+    val mealTypes = listOf("Breakfast", "Lunch", "Dinner", "Snack", "Dessert")
 
     Column(
         modifier = Modifier
