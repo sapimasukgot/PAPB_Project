@@ -32,11 +32,15 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -68,11 +72,46 @@ fun DiscoverScreen(
     onRecipeClick: (String) -> Unit,
     onFilterClick: () -> Unit,
     onSearchClick: () -> Unit,
-    onProfileClick: () -> Unit
+    onProfileClick: () -> Unit,
+    onSignInClick: () -> Unit = {}
 ) {
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
     val recipes by viewModel.recipes.collectAsState()
+    var showAuthDialog by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf("All Recipes") }
     val categories = listOf("All Recipes", "< 15 Mins", "Gluten-Free", "High Protein")
+
+    if (showAuthDialog) {
+        AlertDialog(
+            onDismissRequest = { showAuthDialog = false },
+            title = {
+                Text("Fitur Khusus Pengguna Terdaftar", fontWeight = FontWeight.Bold, color = DarkText)
+            },
+            text = {
+                Text(
+                    "Menyimpan (bookmark) resep hanya dapat dilakukan oleh pengguna terdaftar. Silakan masuk atau daftar terlebih dahulu.",
+                    fontSize = 13.sp,
+                    color = DarkTextSecondary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showAuthDialog = false
+                        onSignInClick()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryYellow, contentColor = DarkText)
+                ) {
+                    Text("Masuk / Daftar", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAuthDialog = false }) {
+                    Text("Nanti Saja", color = DarkText)
+                }
+            }
+        )
+    }
 
     val displayedRecipes = when (selectedCategory) {
         "< 15 Mins" -> recipes.filter { it.durationMinutes <= 15 }
@@ -282,7 +321,7 @@ fun DiscoverScreen(
                                         .size(30.dp)
                                         .clip(CircleShape)
                                         .background(Color.White)
-                                        .clickable { viewModel.toggleBookmark(recipe.id) },
+                                        .clickable { if (isLoggedIn) viewModel.toggleBookmark(recipe.id) else showAuthDialog = true },
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
@@ -401,7 +440,7 @@ fun DiscoverScreen(
                     }
                 }
 
-                IconButton(onClick = { viewModel.toggleBookmark(recipe.id) }) {
+                IconButton(onClick = { if (isLoggedIn) viewModel.toggleBookmark(recipe.id) else showAuthDialog = true }) {
                     Icon(
                         imageVector = if (recipe.isBookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
                         contentDescription = null,
@@ -628,11 +667,46 @@ fun SearchResultScreen(
     viewModel: CookingViewModel,
     onBackClick: () -> Unit,
     onFilterClick: () -> Unit,
-    onRecipeClick: (String) -> Unit
+    onRecipeClick: (String) -> Unit,
+    onSignInClick: () -> Unit = {}
 ) {
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+    var showAuthDialog by remember { mutableStateOf(false) }
     val filteredRecipes by viewModel.filteredRecipes.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     var searchInput by remember { mutableStateOf(searchQuery) }
+
+    if (showAuthDialog) {
+        AlertDialog(
+            onDismissRequest = { showAuthDialog = false },
+            title = {
+                Text("Fitur Khusus Pengguna Terdaftar", fontWeight = FontWeight.Bold, color = DarkText)
+            },
+            text = {
+                Text(
+                    "Menyimpan (bookmark) resep hanya dapat dilakukan oleh pengguna terdaftar. Silakan masuk atau daftar terlebih dahulu.",
+                    fontSize = 13.sp,
+                    color = DarkTextSecondary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showAuthDialog = false
+                        onSignInClick()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryYellow, contentColor = DarkText)
+                ) {
+                    Text("Masuk / Daftar", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAuthDialog = false }) {
+                    Text("Nanti Saja", color = DarkText)
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -751,7 +825,7 @@ fun SearchResultScreen(
                     RecipeCardGrid(
                         recipe = recipe,
                         onClick = { onRecipeClick(recipe.id) },
-                        onBookmarkToggle = { viewModel.toggleBookmark(recipe.id) }
+                        onBookmarkToggle = { if (isLoggedIn) viewModel.toggleBookmark(recipe.id) else showAuthDialog = true }
                     )
                 }
             }

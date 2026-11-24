@@ -55,6 +55,15 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
     val isMetricUnit: StateFlow<Boolean> = repository.preferencesManager.isMetricUnitFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
+    val isLoggedIn: StateFlow<Boolean> = repository.preferencesManager.isLoggedInFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val loggedInEmail: StateFlow<String> = repository.preferencesManager.loggedInEmailFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+
+    val loggedInName: StateFlow<String> = repository.preferencesManager.loggedInNameFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+
     private val _servingsCount = MutableStateFlow(2)
     val servingsCount: StateFlow<Int> = _servingsCount.asStateFlow()
 
@@ -332,5 +341,26 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
             comment = comment
         )
         repository.addReviewInMemory(recipeId, newReview)
+    }
+
+    suspend fun register(fullName: String, email: String, password: String): Result<Unit> {
+        return repository.registerUser(fullName, email, password)
+    }
+
+    suspend fun login(email: String, password: String): Result<Unit> {
+        return repository.loginUser(email, password)
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            repository.logoutUser()
+        }
+    }
+
+    fun deleteAccount(onSuccess: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.deleteAccount()
+            onSuccess()
+        }
     }
 }

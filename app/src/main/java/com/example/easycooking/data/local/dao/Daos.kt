@@ -8,6 +8,7 @@ import androidx.room.Update
 import com.example.easycooking.data.local.entity.GroceryItemEntity
 import com.example.easycooking.data.local.entity.GroceryListEntity
 import com.example.easycooking.data.local.entity.RecipeEntity
+import com.example.easycooking.data.local.entity.UserEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -53,4 +54,16 @@ interface GroceryDao {
 
     @Query("DELETE FROM grocery_items WHERE listId = :listId")
     suspend fun deleteItemsForList(listId: String): Int
+}
+
+@Dao
+interface UserDao {
+    @Query("SELECT * FROM users WHERE LOWER(email) = LOWER(:email) LIMIT 1")
+    suspend fun getUserByEmail(email: String): UserEntity?
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertUser(user: UserEntity)
+
+    @Query("DELETE FROM users WHERE LOWER(email) = LOWER(:email)")
+    suspend fun deleteUser(email: String): Int
 }

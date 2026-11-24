@@ -36,6 +36,9 @@ import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
@@ -48,6 +51,7 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -83,8 +87,10 @@ fun RecipeDetailScreen(
     onBackClick: () -> Unit,
     onStartCookingClick: () -> Unit,
     onWriteReviewClick: () -> Unit,
-    onProfileClick: () -> Unit
+    onProfileClick: () -> Unit,
+    onSignInClick: () -> Unit = {}
 ) {
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
     val recipes by viewModel.recipes.collectAsState()
     val recipe = recipes.find { it.id == recipeId } ?: recipes.firstOrNull() ?: return
     val servings by viewModel.servingsCount.collectAsState()
@@ -92,7 +98,37 @@ fun RecipeDetailScreen(
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val tabTitles = listOf("Ingredients", "Steps", "Reviews")
     var exportSuccessMessage by remember { mutableStateOf(false) }
+    var showAuthDialog by remember { mutableStateOf(false) }
+    var authDialogReason by remember { mutableStateOf("") }
     val isMetricUnit by viewModel.isMetricUnit.collectAsState()
+
+    if (showAuthDialog) {
+        AlertDialog(
+            onDismissRequest = { showAuthDialog = false },
+            title = {
+                Text("Fitur Khusus Pengguna Terdaftar", fontWeight = FontWeight.Bold, color = DarkText)
+            },
+            text = {
+                Text(authDialogReason, fontSize = 13.sp, color = DarkTextSecondary)
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showAuthDialog = false
+                        onSignInClick()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryYellow, contentColor = DarkText)
+                ) {
+                    Text("Masuk / Daftar", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAuthDialog = false }) {
+                    Text("Nanti Saja", color = DarkText)
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -215,7 +251,14 @@ fun RecipeDetailScreen(
                         }
                     }
 
-                    IconButton(onClick = { viewModel.toggleBookmark(recipe.id) }) {
+                    IconButton(onClick = {
+                        if (isLoggedIn) {
+                            viewModel.toggleBookmark(recipe.id)
+                        } else {
+                            authDialogReason = "Menyimpan (bookmark) resep hanya dapat dilakukan oleh pengguna terdaftar."
+                            showAuthDialog = true
+                        }
+                    }) {
                         Icon(
                             imageVector = if (recipe.isBookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
                             contentDescription = "Bookmark",
@@ -477,7 +520,14 @@ fun RecipeDetailScreen(
                         }
 
                         OutlinedButton(
-                            onClick = onWriteReviewClick,
+                            onClick = {
+                                if (isLoggedIn) {
+                                    onWriteReviewClick()
+                                } else {
+                                    authDialogReason = "Memberi rating dan ulasan resep hanya dapat dilakukan oleh pengguna terdaftar."
+                                    showAuthDialog = true
+                                }
+                            },
                             shape = RoundedCornerShape(20.dp)
                         ) {
                             Text("+ Review", color = DarkText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
@@ -613,8 +663,13 @@ fun RecipeDetailScreen(
                     PrimaryYellowButton(
                         text = "Export to Grocery Checklist",
                         onClick = {
-                            viewModel.exportRecipeToGrocery(recipe)
-                            exportSuccessMessage = true
+                            if (isLoggedIn) {
+                                viewModel.exportRecipeToGrocery(recipe)
+                                exportSuccessMessage = true
+                            } else {
+                                authDialogReason = "Mengekspor bahan resep ke daftar belanja hanya dapat dilakukan oleh pengguna terdaftar."
+                                showAuthDialog = true
+                            }
                         }
                     )
                 } else if (selectedTabIndex == 1) {
@@ -625,7 +680,14 @@ fun RecipeDetailScreen(
                 } else {
                     PrimaryYellowButton(
                         text = "Write a Review",
-                        onClick = onWriteReviewClick
+                        onClick = {
+                            if (isLoggedIn) {
+                                onWriteReviewClick()
+                            } else {
+                                authDialogReason = "Memberi rating dan ulasan resep hanya dapat dilakukan oleh pengguna terdaftar."
+                                showAuthDialog = true
+                            }
+                        }
                     )
                 }
             }

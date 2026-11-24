@@ -6,6 +6,7 @@ import com.example.easycooking.data.local.PreferencesManager
 import com.example.easycooking.data.local.entity.GroceryItemEntity
 import com.example.easycooking.data.local.entity.GroceryListEntity
 import com.example.easycooking.data.local.entity.RecipeEntity
+import com.example.easycooking.data.local.entity.UserEntity
 import com.example.easycooking.model.GroceryItem
 import com.example.easycooking.model.GroceryList
 import com.example.easycooking.model.Ingredient
@@ -16,6 +17,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -27,6 +29,7 @@ class AppRepository(
     private val database = AppDatabase.getDatabase(context)
     private val recipeDao = database.recipeDao()
     private val groceryDao = database.groceryDao()
+    private val userDao = database.userDao()
     val preferencesManager = PreferencesManager(context)
 
     private val inMemoryRecipes = mutableMapOf<String, Recipe>()
@@ -335,5 +338,51 @@ class AppRepository(
             )
             inMemoryRecipes[recipeId] = updated
         }
+    }
+
+    suspend fun registerUser(fullName: String, email: String, password: String): Result<Unit> = withContext(ioDispatcher) {
+        val cleanEmail = email.trim().lowercase()
+        val cleanName = fullName.trim()
+        if (cleanName.isBlank() || cleanEmail.isBlank() || password.isBlank()) {
+            return@withContext Result.failure(IllegalArgumentException("Semua field wajib diisi"))
+        }
+        val existing = userDao.getUserByEmail(cleanEmail)
+        if (existing != null) {
+            return@withContext Result.failure(IllegalStateException("Email sudah terdaftar"))
+        }
+        val user = UserEntity(
+            email = cleanEmail,
+            fullName = cleanName,
+            password = password
+        )
+        userDao.insertUser(user)
+        preferencesManager.setLoggedInUser(cleanEmail, cleanName)
+        Result.success(Unit)
+    }
+
+    suspend fun loginUser(email: String, password: String): Result<Unit> = withContext(ioDispatcher) {
+        val cleanEmail = email.trim().lowercase()
+        if (cleanEmail.isBlank() || password.isBlank()) {
+            return@withContext Result.failure(IllegalArgumentException("Email dan password tidak boleh kosong"))
+        }
+        val user = userDao.getUserByEmail(cleanEmail)
+        if (user == null || user.password != password) {
+            return@withContext Result.failure(IllegalArgumentException("Email atau kata sandi salah"))
+        }
+        preferencesManager.setLoggedInUser(user.email, user.fullName)
+        Result.success(Unit)
+    }
+
+    suspend fun logoutUser() = withContext(ioDispatcher) {
+        preferencesManager.clearLoggedInUser()
+    }
+
+    suspend fun deleteAccount(): Result<Unit> = withContext(ioDispatcher) {
+        val email = preferencesManager.loggedInEmailFlow.first()
+        if (email.isNotBlank()) {
+            userDao.deleteUser(email)
+        }
+        preferencesManager.clearLoggedInUser()
+        Result.success(Unit)
     }
 }

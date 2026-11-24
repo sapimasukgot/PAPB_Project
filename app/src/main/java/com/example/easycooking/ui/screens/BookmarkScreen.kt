@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -40,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.easycooking.ui.components.RecipeCardGrid
@@ -56,8 +58,10 @@ fun SavedScreen(
     onAddRecipeClick: () -> Unit,
     onSearchClick: () -> Unit,
     onOpenPlanClick: () -> Unit = {},
-    onBrowseClick: () -> Unit = {}
+    onBrowseClick: () -> Unit = {},
+    onSignInClick: () -> Unit = {}
 ) {
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
     val recipes by viewModel.recipes.collectAsState()
     val savedRecipes = recipes.filter { it.isBookmarked }
 
@@ -90,7 +94,9 @@ fun SavedScreen(
                         Icon(Icons.Filled.Search, contentDescription = "Search", tint = DarkText)
                     }
                     Button(
-                        onClick = onAddRecipeClick,
+                        onClick = {
+                            if (isLoggedIn) onAddRecipeClick() else onSignInClick()
+                        },
                         shape = RoundedCornerShape(20.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = PrimaryYellow,
@@ -108,81 +114,129 @@ fun SavedScreen(
             }
         }
 
-        item {
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(categories) { category ->
-                    val isSelected = category == selectedCategory
-                    val label = if (category == "All") "All (${savedRecipes.size})" else category
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(if (isSelected) PrimaryYellow else LightGrayBg)
-                            .clickable { selectedCategory = category }
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                    ) {
+        if (!isLoggedIn) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(LightGrayBg)
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Filled.Lock,
+                            contentDescription = null,
+                            tint = DarkTextSecondary,
+                            modifier = Modifier.size(44.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = label,
-                            fontSize = 13.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            text = "Simpan Resep Favorit",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
                             color = DarkText
                         )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Fitur bookmark dan resep tersimpan hanya tersedia untuk pengguna terdaftar.",
+                            fontSize = 12.sp,
+                            color = DarkTextSecondary,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = onSignInClick,
+                            shape = RoundedCornerShape(20.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = PrimaryYellow,
+                                contentColor = DarkText
+                            )
+                        ) {
+                            Text("Masuk / Daftar Akun", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Handpicked favourites",
-                    fontSize = 13.sp,
-                    color = DarkTextSecondary
-                )
-                Text(
-                    text = "Sorted by: Recent",
-                    fontSize = 12.sp,
-                    color = DarkTextSecondary
-                )
-            }
-            Spacer(modifier = Modifier.height(14.dp))
-        }
-
-        item {
-            val filteredRecipes = when (selectedCategory) {
-                "All" -> savedRecipes
-                "Quick Dinners" -> savedRecipes.filter { it.category.contains("Dinner", ignoreCase = true) || it.durationMinutes <= 30 }
-                else -> savedRecipes.filter { it.category.equals(selectedCategory, ignoreCase = true) }
-            }
-            val chunkedList = filteredRecipes.chunked(2)
-
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                chunkedList.forEach { rowRecipes ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        rowRecipes.forEach { recipe ->
-                            RecipeCardGrid(
-                                recipe = recipe,
-                                onClick = { onRecipeClick(recipe.id) },
-                                onBookmarkToggle = { viewModel.toggleBookmark(recipe.id) },
-                                modifier = Modifier.weight(1f)
+        } else {
+            item {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(categories) { category ->
+                        val isSelected = category == selectedCategory
+                        val label = if (category == "All") "All (${savedRecipes.size})" else category
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(if (isSelected) PrimaryYellow else LightGrayBg)
+                                .clickable { selectedCategory = category }
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 13.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = DarkText
                             )
                         }
-                        if (rowRecipes.size == 1) {
-                            Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Handpicked favourites",
+                        fontSize = 13.sp,
+                        color = DarkTextSecondary
+                    )
+                    Text(
+                        text = "Sorted by: Recent",
+                        fontSize = 12.sp,
+                        color = DarkTextSecondary
+                    )
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+
+            item {
+                val filteredRecipes = when (selectedCategory) {
+                    "All" -> savedRecipes
+                    "Quick Dinners" -> savedRecipes.filter { it.category.contains("Dinner", ignoreCase = true) || it.durationMinutes <= 30 }
+                    else -> savedRecipes.filter { it.category.equals(selectedCategory, ignoreCase = true) }
+                }
+                val chunkedList = filteredRecipes.chunked(2)
+
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    chunkedList.forEach { rowRecipes ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            rowRecipes.forEach { recipe ->
+                                RecipeCardGrid(
+                                    recipe = recipe,
+                                    onClick = { onRecipeClick(recipe.id) },
+                                    onBookmarkToggle = { viewModel.toggleBookmark(recipe.id) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (rowRecipes.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
                         }
                     }
                 }
+                Spacer(modifier = Modifier.height(20.dp))
             }
-            Spacer(modifier = Modifier.height(20.dp))
         }
 
         item {

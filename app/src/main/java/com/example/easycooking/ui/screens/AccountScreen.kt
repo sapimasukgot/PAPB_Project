@@ -32,10 +32,12 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Tab
@@ -78,6 +80,68 @@ fun AccountScreen(
     var offlineBannerVisible by remember { mutableStateOf(true) }
     var selectedTab by remember { mutableIntStateOf(0) }
     val isMetricUnit by viewModel.isMetricUnit.collectAsState()
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+    val loggedInName by viewModel.loggedInName.collectAsState()
+    val loggedInEmail by viewModel.loggedInEmail.collectAsState()
+    var showAuthDialog by remember { mutableStateOf(false) }
+    var authDialogReason by remember { mutableStateOf("") }
+    var showDeleteAccountDialog by remember { mutableStateOf(false) }
+
+    if (showAuthDialog) {
+        AlertDialog(
+            onDismissRequest = { showAuthDialog = false },
+            title = {
+                Text("Fitur Khusus Pengguna Terdaftar", fontWeight = FontWeight.Bold, color = DarkText)
+            },
+            text = {
+                Text(authDialogReason, fontSize = 13.sp, color = DarkTextSecondary)
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showAuthDialog = false
+                        onSignInClick()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryYellow, contentColor = DarkText)
+                ) {
+                    Text("Masuk / Daftar", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAuthDialog = false }) {
+                    Text("Batal", color = DarkText)
+                }
+            }
+        )
+    }
+
+    if (showDeleteAccountDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteAccountDialog = false },
+            title = {
+                Text("Hapus Akun", fontWeight = FontWeight.Bold, color = Color(0xFFDC2626))
+            },
+            text = {
+                Text("Apakah Anda yakin ingin menghapus akun Anda? Seluruh data akun akan dihapus secara permanen.", fontSize = 13.sp, color = DarkTextSecondary)
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteAccountDialog = false
+                        viewModel.deleteAccount()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626), contentColor = Color.White)
+                ) {
+                    Text("Hapus", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteAccountDialog = false }) {
+                    Text("Batal", color = DarkText)
+                }
+            }
+        )
+    }
 
     val creatorRecipes = listOf(
         Triple("Creamy Truffle Risotto", "Dinner | 25m | Published", "4.9"),
@@ -180,11 +244,24 @@ fun AccountScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("Guest User", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                                    Text(
+                                        text = if (isLoggedIn && loggedInName.isNotBlank()) loggedInName else "Guest User",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = DarkText
+                                    )
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("- Local Storage", fontSize = 11.sp, color = DarkTextSecondary)
+                                    Text(
+                                        text = if (isLoggedIn) "- Member" else "- Local Storage",
+                                        fontSize = 11.sp,
+                                        color = DarkTextSecondary
+                                    )
                                 }
-                                Text("Sign in to sync recipes & grocery items across devices.", fontSize = 11.sp, color = DarkTextSecondary)
+                                Text(
+                                    text = if (isLoggedIn && loggedInEmail.isNotBlank()) loggedInEmail else "Sign in to sync recipes & grocery items across devices.",
+                                    fontSize = 11.sp,
+                                    color = DarkTextSecondary
+                                )
                             }
                         }
 
@@ -220,10 +297,20 @@ fun AccountScreen(
 
                         Spacer(modifier = Modifier.height(14.dp))
 
-                        PrimaryYellowButton(
-                            text = "Sign In / Register",
-                            onClick = onSignInClick
-                        )
+                        if (isLoggedIn) {
+                            OutlinedButton(
+                                onClick = { viewModel.logout() },
+                                shape = RoundedCornerShape(20.dp),
+                                modifier = Modifier.fillMaxWidth().height(48.dp)
+                            ) {
+                                Text("Sign Out", fontWeight = FontWeight.Bold, color = Color(0xFFDC2626))
+                            }
+                        } else {
+                            PrimaryYellowButton(
+                                text = "Sign In / Register",
+                                onClick = onSignInClick
+                            )
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(20.dp))
@@ -240,14 +327,35 @@ fun AccountScreen(
                         title = "Measurement Units",
                         subtitle = if (isMetricUnit) "Grams, milliliters, and Celsius | Metric (g, ml)" else "Ounces, cups, and Fahrenheit | Imperial (oz, cups)",
                         trailingBadge = if (isMetricUnit) "Metric" else "Imperial",
-                        onClick = { viewModel.toggleMeasurementUnit() }
+                        onClick = {
+                            if (isLoggedIn) {
+                                viewModel.toggleMeasurementUnit()
+                            } else {
+                                authDialogReason = "Mengonversi satuan takaran hanya dapat dilakukan oleh pengguna terdaftar."
+                                showAuthDialog = true
+                            }
+                        }
                     )
                     AccountMenuItem(
                         title = "Switch to Creator View",
                         subtitle = "View published recipes & analytics",
                         trailingBadge = "Pro Mode",
-                        onClick = { isCreatorMode = true }
+                        onClick = {
+                            if (isLoggedIn) {
+                                isCreatorMode = true
+                            } else {
+                                authDialogReason = "Fitur resep pribadi dan mode kreator hanya dapat diakses oleh pengguna terdaftar."
+                                showAuthDialog = true
+                            }
+                        }
                     )
+                    if (isLoggedIn) {
+                        AccountMenuItem(
+                            title = "Delete Account",
+                            subtitle = "Permanently remove your account and data",
+                            onClick = { showDeleteAccountDialog = true }
+                        )
+                    }
                     AccountMenuItem(
                         title = "Help & Support",
                         subtitle = "FAQ, kitchen tips & contact us",

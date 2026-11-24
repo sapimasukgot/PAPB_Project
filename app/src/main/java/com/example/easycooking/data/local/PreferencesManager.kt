@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +20,9 @@ class PreferencesManager(private val context: Context) {
         val KEY_STRICT_ALLERGEN = booleanPreferencesKey("strict_allergen_filter")
         val KEY_SELECTED_ALLERGENS = stringSetPreferencesKey("selected_allergens")
         val KEY_SELECTED_DIETARY = stringSetPreferencesKey("selected_dietary")
+        val KEY_IS_LOGGED_IN = booleanPreferencesKey("is_logged_in")
+        val KEY_LOGGED_IN_EMAIL = stringPreferencesKey("logged_in_email")
+        val KEY_LOGGED_IN_NAME = stringPreferencesKey("logged_in_name")
     }
 
     val isMetricUnitFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -35,6 +39,18 @@ class PreferencesManager(private val context: Context) {
 
     val selectedDietaryFlow: Flow<Set<String>> = context.dataStore.data.map { preferences ->
         preferences[KEY_SELECTED_DIETARY] ?: setOf("Vegetarian", "Gluten-Free")
+    }
+
+    val isLoggedInFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_IS_LOGGED_IN] ?: false
+    }
+
+    val loggedInEmailFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[KEY_LOGGED_IN_EMAIL] ?: ""
+    }
+
+    val loggedInNameFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[KEY_LOGGED_IN_NAME] ?: ""
     }
 
     suspend fun setMetricUnit(isMetric: Boolean) {
@@ -58,6 +74,22 @@ class PreferencesManager(private val context: Context) {
     suspend fun setSelectedDietary(dietary: Set<String>) {
         context.dataStore.edit { preferences ->
             preferences[KEY_SELECTED_DIETARY] = dietary
+        }
+    }
+
+    suspend fun setLoggedInUser(email: String, name: String) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_IS_LOGGED_IN] = true
+            preferences[KEY_LOGGED_IN_EMAIL] = email
+            preferences[KEY_LOGGED_IN_NAME] = name
+        }
+    }
+
+    suspend fun clearLoggedInUser() {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_IS_LOGGED_IN] = false
+            preferences[KEY_LOGGED_IN_EMAIL] = ""
+            preferences[KEY_LOGGED_IN_NAME] = ""
         }
     }
 }

@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Button
@@ -48,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -69,8 +71,10 @@ import com.example.easycooking.viewmodel.CookingViewModel
 fun GroceryOverviewScreen(
     viewModel: CookingViewModel,
     onListClick: (String) -> Unit,
-    onDiscoverClick: () -> Unit = {}
+    onDiscoverClick: () -> Unit = {},
+    onSignInClick: () -> Unit = {}
 ) {
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
     val groceryLists by viewModel.groceryLists.collectAsState()
     val activeLists = groceryLists.filter { !it.isCompleted }
     val completedLists = groceryLists.filter { it.isCompleted }
@@ -103,8 +107,12 @@ fun GroceryOverviewScreen(
 
                 Button(
                     onClick = {
-                        val firstList = activeLists.firstOrNull()
-                        if (firstList != null) onListClick(firstList.id)
+                        if (isLoggedIn) {
+                            val firstList = activeLists.firstOrNull()
+                            if (firstList != null) onListClick(firstList.id)
+                        } else {
+                            onSignInClick()
+                        }
                     },
                     shape = RoundedCornerShape(20.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -122,146 +130,128 @@ fun GroceryOverviewScreen(
             }
         }
 
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(LightGrayBg)
-                    .padding(14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(AmberBadgeBg),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Filled.ShoppingCart, contentDescription = null, tint = AmberBadgeText, modifier = Modifier.size(20.dp))
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
+        if (!isLoggedIn) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(LightGrayBg)
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Filled.Lock,
+                            contentDescription = null,
+                            tint = DarkTextSecondary,
+                            modifier = Modifier.size(44.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "8 items to buy",
-                            fontSize = 15.sp,
+                            text = "Daftar Belanja Bahan Masakan",
+                            fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             color = DarkText
                         )
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Across 2 active lists",
+                            text = "Masuk atau buat akun untuk membuat, melihat, dan mengelola daftar belanja bahan masakan Anda.",
                             fontSize = 12.sp,
-                            color = DarkTextSecondary
+                            color = DarkTextSecondary,
+                            textAlign = TextAlign.Center
                         )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = onSignInClick,
+                            shape = RoundedCornerShape(20.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = PrimaryYellow,
+                                contentColor = DarkText
+                            )
+                        ) {
+                            Text("Masuk / Daftar Akun", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
-
-                Button(
-                    onClick = {
-                        val firstList = activeLists.firstOrNull()
-                        if (firstList != null) onListClick(firstList.id)
-                    },
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = PrimaryYellow,
-                        contentColor = DarkText
-                    )
-                ) {
-                    Text("Start Shopping", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                }
             }
-            Spacer(modifier = Modifier.height(20.dp))
-        }
-
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Active Lists (${activeLists.size})",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = DarkText
-                )
-                Text(
-                    text = "Tap to view",
-                    fontSize = 12.sp,
-                    color = DarkTextSecondary
-                )
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-        }
-
-        items(activeLists) { list ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 5.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(LightGrayBg)
-                    .clickable { onListClick(list.id) }
-                    .padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
+        } else {
+            item {
+                Row(
                     modifier = Modifier
-                        .size(54.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(PlaceholderImageBg)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(LightGrayBg)
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(AmberBadgeBg),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.ShoppingCart, contentDescription = null, tint = AmberBadgeText, modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "8 items to buy",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = DarkText
+                            )
+                            Text(
+                                text = "Across 2 active lists",
+                                fontSize = 12.sp,
+                                color = DarkTextSecondary
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            val firstList = activeLists.firstOrNull()
+                            if (firstList != null) onListClick(firstList.id)
+                        },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = PrimaryYellow,
+                            contentColor = DarkText
+                        )
+                    ) {
+                        Text("Start Shopping", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = list.title,
+                        text = "Active Lists (${activeLists.size})",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = DarkText
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "${list.remainingItems}/${list.totalItems} items left | ${list.updatedAt}",
-                        fontSize = 11.sp,
+                        text = "Tap to view",
+                        fontSize = 12.sp,
                         color = DarkTextSecondary
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    val progress = if (list.totalItems > 0) (list.totalItems - list.remainingItems).toFloat() / list.totalItems else 0f
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(5.dp)
-                            .clip(RoundedCornerShape(3.dp)),
-                        color = PrimaryYellow,
-                        trackColor = Color(0xFFE2E8F0)
-                    )
                 }
-                IconButton(onClick = { viewModel.deleteGroceryList(list.id) }) {
-                    Icon(
-                        imageVector = Icons.Filled.DeleteOutline,
-                        contentDescription = "Delete",
-                        tint = DarkTextSecondary
-                    )
-                }
-            }
-        }
-
-        if (completedLists.isNotEmpty()) {
-            item {
-                Spacer(modifier = Modifier.height(20.dp))
-                Text(
-                    text = "Completed (${completedLists.size})",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = DarkText
-                )
                 Spacer(modifier = Modifier.height(10.dp))
             }
 
-            items(completedLists) { list ->
+            items(activeLists) { list ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -276,24 +266,32 @@ fun GroceryOverviewScreen(
                         modifier = Modifier
                             .size(54.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(GreenSuccessBg),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Filled.Check, contentDescription = null, tint = GreenSuccessText)
-                    }
+                            .background(PlaceholderImageBg)
+                    )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = list.title,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            color = DarkTextSecondary,
-                            textDecoration = TextDecoration.LineThrough
+                            color = DarkText
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "${list.totalItems}/${list.totalItems} completed | ${list.updatedAt}",
+                            text = "${list.remainingItems}/${list.totalItems} items left | ${list.updatedAt}",
                             fontSize = 11.sp,
                             color = DarkTextSecondary
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        val progress = if (list.totalItems > 0) (list.totalItems - list.remainingItems).toFloat() / list.totalItems else 0f
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(5.dp)
+                                .clip(RoundedCornerShape(3.dp)),
+                            color = PrimaryYellow,
+                            trackColor = Color(0xFFE2E8F0)
                         )
                     }
                     IconButton(onClick = { viewModel.deleteGroceryList(list.id) }) {
@@ -302,6 +300,64 @@ fun GroceryOverviewScreen(
                             contentDescription = "Delete",
                             tint = DarkTextSecondary
                         )
+                    }
+                }
+            }
+
+            if (completedLists.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text(
+                        text = "Completed (${completedLists.size})",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = DarkText
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+
+                items(completedLists) { list ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 5.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(LightGrayBg)
+                            .clickable { onListClick(list.id) }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(54.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(GreenSuccessBg),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.Check, contentDescription = null, tint = GreenSuccessText)
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = list.title,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = DarkTextSecondary,
+                                textDecoration = TextDecoration.LineThrough
+                            )
+                            Text(
+                                text = "${list.totalItems}/${list.totalItems} completed | ${list.updatedAt}",
+                                fontSize = 11.sp,
+                                color = DarkTextSecondary
+                            )
+                        }
+                        IconButton(onClick = { viewModel.deleteGroceryList(list.id) }) {
+                            Icon(
+                                imageVector = Icons.Filled.DeleteOutline,
+                                contentDescription = "Delete",
+                                tint = DarkTextSecondary
+                            )
+                        }
                     }
                 }
             }

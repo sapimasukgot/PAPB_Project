@@ -39,3 +39,11 @@ data class GroceryItemEntity(
     val category: String,
     val isChecked: Boolean = false
 )
+
+@Entity(tableName = "users")
+data class UserEntity(
+    @PrimaryKey val email: String,
+    val fullName: String,
+    val password: String,
+    val createdAt: Long = System.currentTimeMillis()
+)

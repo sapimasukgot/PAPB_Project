@@ -41,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +54,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.easycooking.ui.components.PrimaryYellowButton
+import com.example.easycooking.viewmodel.CookingViewModel
+import kotlinx.coroutines.launch
 import com.example.easycooking.ui.theme.DarkText
 import com.example.easycooking.ui.theme.DarkTextSecondary
 import com.example.easycooking.ui.theme.LightGrayBg
@@ -127,36 +130,38 @@ fun WelcomeScreen(
 
 @Composable
 fun LoginScreen(
+    viewModel: CookingViewModel,
     onBackClick: () -> Unit,
     onSignInSuccess: () -> Unit,
     onForgotPasswordClick: () -> Unit,
     onCreateAccountClick: () -> Unit
 ) {
-    var email by remember { mutableStateOf("alex@example.com") }
-    var password by remember { mutableStateOf("************") }
+    val coroutineScope = rememberCoroutineScope()
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var showPasswordErrorDialog by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    if (showPasswordErrorDialog) {
+    if (errorMessage != null) {
         AlertDialog(
-            onDismissRequest = { showPasswordErrorDialog = false },
+            onDismissRequest = { errorMessage = null },
             title = {
                 Text(
-                    text = "Warning Password Salah",
+                    text = "Pemberitahuan",
                     fontWeight = FontWeight.Bold,
                     color = DarkText
                 )
             },
             text = {
                 Text(
-                    text = "Alamat email atau kata sandi yang Anda masukkan tidak sesuai dengan database akun terdaftar. Silakan periksa kembali atau pilih Lupa Kata Sandi.",
+                    text = errorMessage ?: "",
                     color = DarkTextSecondary,
                     fontSize = 13.sp
                 )
             },
             confirmButton = {
                 Button(
-                    onClick = { showPasswordErrorDialog = false },
+                    onClick = { errorMessage = null },
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryYellow)
                 ) {
                     Text("Coba Lagi", color = Color.White)
@@ -164,7 +169,7 @@ fun LoginScreen(
             },
             dismissButton = {
                 TextButton(onClick = {
-                    showPasswordErrorDialog = false
+                    errorMessage = null
                     onForgotPasswordClick()
                 }) {
                     Text("Lupa Kata Sandi?", color = DarkText)
@@ -306,10 +311,17 @@ fun LoginScreen(
         PrimaryYellowButton(
             text = "Sign In",
             onClick = {
-                if (password.length < 4 || !email.contains("@")) {
-                    showPasswordErrorDialog = true
+                if (!email.contains("@") || password.length < 4) {
+                    errorMessage = "Alamat email atau kata sandi tidak valid (minimal 4 karakter)."
                 } else {
-                    onSignInSuccess()
+                    coroutineScope.launch {
+                        val result = viewModel.login(email, password)
+                        if (result.isSuccess) {
+                            onSignInSuccess()
+                        } else {
+                            errorMessage = result.exceptionOrNull()?.message ?: "Gagal masuk"
+                        }
+                    }
                 }
             }
         )
@@ -380,14 +392,45 @@ fun LoginScreen(
 
 @Composable
 fun RegisterScreen(
+    viewModel: CookingViewModel,
     onBackClick: () -> Unit,
     onRegisterSuccess: () -> Unit,
     onSignInClick: () -> Unit
 ) {
-    var fullName by remember { mutableStateOf("Alex Morgan") }
-    var email by remember { mutableStateOf("alex@example.com") }
-    var password by remember { mutableStateOf("************") }
+    val coroutineScope = rememberCoroutineScope()
+    var fullName by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    if (errorMessage != null) {
+        AlertDialog(
+            onDismissRequest = { errorMessage = null },
+            title = {
+                Text(
+                    text = "Pendaftaran Gagal",
+                    fontWeight = FontWeight.Bold,
+                    color = DarkText
+                )
+            },
+            text = {
+                Text(
+                    text = errorMessage ?: "",
+                    color = DarkTextSecondary,
+                    fontSize = 13.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { errorMessage = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryYellow)
+                ) {
+                    Text("OK", color = Color.White)
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -513,7 +556,24 @@ fun RegisterScreen(
 
         PrimaryYellowButton(
             text = "Create Account",
-            onClick = onRegisterSuccess
+            onClick = {
+                if (fullName.isBlank()) {
+                    errorMessage = "Nama lengkap wajib diisi."
+                } else if (!email.contains("@")) {
+                    errorMessage = "Format email tidak valid."
+                } else if (password.length < 4) {
+                    errorMessage = "Kata sandi minimal 4 karakter."
+                } else {
+                    coroutineScope.launch {
+                        val result = viewModel.register(fullName, email, password)
+                        if (result.isSuccess) {
+                            onRegisterSuccess()
+                        } else {
+                            errorMessage = result.exceptionOrNull()?.message ?: "Gagal mendaftar"
+                        }
+                    }
+                }
+            }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
