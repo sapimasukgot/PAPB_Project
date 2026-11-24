@@ -61,8 +61,8 @@ fun SavedScreen(
     val recipes by viewModel.recipes.collectAsState()
     val savedRecipes = recipes.filter { it.isBookmarked }
 
-    var selectedPill by remember { mutableStateOf("All (12)") }
-    val pills = listOf("All (12)", "Breakfast", "Quick Dinners", "Desserts")
+    var selectedCategory by remember { mutableStateOf("All") }
+    val categories = listOf("All", "Breakfast", "Quick Dinners", "Desserts")
 
     LazyColumn(
         modifier = Modifier
@@ -112,17 +112,18 @@ fun SavedScreen(
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(pills) { pill ->
-                    val isSelected = pill == selectedPill
+                items(categories) { category ->
+                    val isSelected = category == selectedCategory
+                    val label = if (category == "All") "All (${savedRecipes.size})" else category
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
                             .background(if (isSelected) PrimaryYellow else LightGrayBg)
-                            .clickable { selectedPill = pill }
+                            .clickable { selectedCategory = category }
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         Text(
-                            text = pill,
+                            text = label,
                             fontSize = 13.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             color = DarkText
@@ -154,8 +155,14 @@ fun SavedScreen(
         }
 
         item {
+            val filteredRecipes = when (selectedCategory) {
+                "All" -> savedRecipes
+                "Quick Dinners" -> savedRecipes.filter { it.category.contains("Dinner", ignoreCase = true) || it.durationMinutes <= 30 }
+                else -> savedRecipes.filter { it.category.equals(selectedCategory, ignoreCase = true) }
+            }
+            val chunkedList = filteredRecipes.chunked(2)
+
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                val chunkedList = savedRecipes.chunked(2)
                 chunkedList.forEach { rowRecipes ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
