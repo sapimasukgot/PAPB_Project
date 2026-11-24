@@ -44,13 +44,13 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
     val selectedAllergens: StateFlow<Set<String>> = repository.preferencesManager.selectedAllergensFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), setOf("Peanuts", "Tree Nuts"))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
     val selectedDietaryLifestyles: StateFlow<Set<String>> = repository.preferencesManager.selectedDietaryFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), setOf("Vegetarian", "Gluten-Free"))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
     val strictAllergenFilter: StateFlow<Boolean> = repository.preferencesManager.strictAllergenFilterFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val isMetricUnit: StateFlow<Boolean> = repository.preferencesManager.isMetricUnitFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
@@ -99,18 +99,38 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
     )
     val newRecipeIngredients: StateFlow<List<String>> = _newRecipeIngredients.asStateFlow()
 
-    val filteredRecipes: StateFlow<List<Recipe>> = combine(
+    val curatedRecipes: StateFlow<List<Recipe>> = combine(
         recipes,
-        filterState,
-        searchQuery,
-        selectedAllergens,
-        strictAllergenFilter
-    ) { rList, filter, query, userAllergens, strictFilter ->
+        combine(selectedAllergens, strictAllergenFilter, selectedDietaryLifestyles) { a, b, c -> Triple(a, b, c) }
+    ) { rList, pref ->
+        val userAllergens = pref.first
+        val strictFilter = pref.second
+        val userDietary = pref.third
         rList.filter { recipe ->
             val isAllergenSafe = if (strictFilter && userAllergens.isNotEmpty()) {
-                recipe.allergens.none { it in userAllergens }
+                recipe.allergens.none { recipeAllergen ->
+                    userAllergens.any { it.equals(recipeAllergen, ignoreCase = true) }
+                }
             } else true
 
+            val matchesUserDietary = if (userDietary.isNotEmpty()) {
+                userDietary.all { badge ->
+                    recipe.dietaryBadges.any { it.equals(badge, ignoreCase = true) }
+                }
+            } else true
+
+            isAllergenSafe && matchesUserDietary
+        }
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val filteredRecipes: StateFlow<List<Recipe>> = combine(
+        curatedRecipes,
+        filterState,
+        searchQuery
+    ) { rList, filter, query ->
+        rList.filter { recipe ->
             val matchesDuration = when (filter.selectedDuration) {
                 "< 15m", "< 15 Mins" -> recipe.durationMinutes < 15
                 "15-30m" -> recipe.durationMinutes in 15..30
@@ -124,7 +144,9 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
             } else true
 
             val matchesDietary = if (filter.selectedDietary.isNotEmpty()) {
-                filter.selectedDietary.any { badge -> recipe.dietaryBadges.contains(badge) }
+                filter.selectedDietary.all { badge ->
+                    recipe.dietaryBadges.any { it.equals(badge, ignoreCase = true) }
+                }
             } else true
 
             val matchesQuery = if (query.isNotBlank()) {
@@ -133,7 +155,7 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
                         recipe.ingredients.any { it.name.contains(query, ignoreCase = true) }
             } else true
 
-            isAllergenSafe && matchesDuration && matchesMealType && matchesDietary && matchesQuery
+            matchesDuration && matchesMealType && matchesDietary && matchesQuery
         }
     }
         .flowOn(Dispatchers.Default)
@@ -285,11 +307,17 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun updateFilterDuration(duration: String) {
-        _filterState.update { it.copy(selectedDuration = duration) }
+        _filterState.update { current ->
+            val newDuration = if (current.selectedDuration == duration) "" else duration
+            current.copy(selectedDuration = newDuration)
+        }
     }
 
     fun updateFilterMealType(mealType: String) {
-        _filterState.update { it.copy(selectedMealType = mealType) }
+        _filterState.update { current ->
+            val newMealType = if (current.selectedMealType == mealType) "" else mealType
+            current.copy(selectedMealType = newMealType)
+        }
     }
 
     fun toggleFilterDietary(dietary: String) {

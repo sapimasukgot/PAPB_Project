@@ -192,9 +192,9 @@ data class GroceryList(
 }
 
 data class FilterState(
-    val selectedDuration: String = "15-30m",
-    val selectedDietary: Set<String> = setOf("Gluten-Free", "Nut-Free"),
-    val selectedMealType: String = "Dinner",
-    val selectedAllergens: Set<String> = setOf("Peanuts", "Tree Nuts"),
-    val strictAllergenFilter: Boolean = true
+    val selectedDuration: String = "",
+    val selectedDietary: Set<String> = emptySet(),
+    val selectedMealType: String = "",
+    val selectedAllergens: Set<String> = emptySet(),
+    val strictAllergenFilter: Boolean = false
 )

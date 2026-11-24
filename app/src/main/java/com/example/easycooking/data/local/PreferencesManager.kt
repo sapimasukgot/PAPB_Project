@@ -30,15 +30,15 @@ class PreferencesManager(private val context: Context) {
     }
 
     val strictAllergenFilterFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
-        preferences[KEY_STRICT_ALLERGEN] ?: true
+        preferences[KEY_STRICT_ALLERGEN] ?: false
     }
 
     val selectedAllergensFlow: Flow<Set<String>> = context.dataStore.data.map { preferences ->
-        preferences[KEY_SELECTED_ALLERGENS] ?: setOf("Peanuts", "Tree Nuts")
+        preferences[KEY_SELECTED_ALLERGENS] ?: emptySet()
     }
 
     val selectedDietaryFlow: Flow<Set<String>> = context.dataStore.data.map { preferences ->
-        preferences[KEY_SELECTED_DIETARY] ?: setOf("Vegetarian", "Gluten-Free")
+        preferences[KEY_SELECTED_DIETARY] ?: emptySet()
     }
 
     val isLoggedInFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->

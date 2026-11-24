@@ -76,7 +76,7 @@ fun DiscoverScreen(
     onSignInClick: () -> Unit = {}
 ) {
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
-    val recipes by viewModel.recipes.collectAsState()
+    val recipes by viewModel.curatedRecipes.collectAsState()
     var showAuthDialog by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf("All Recipes") }
     val categories = listOf("All Recipes", "< 15 Mins", "Gluten-Free", "High Protein")
@@ -246,7 +246,7 @@ fun DiscoverScreen(
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = "3",
+                            text = "${minOf(displayedRecipes.size, 3)}",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = DarkText
@@ -450,6 +450,32 @@ fun DiscoverScreen(
             }
         }
 
+        if (displayedRecipes.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "No matching recipes found",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = DarkText
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Try adjusting your dietary or allergen preferences in Account.",
+                            fontSize = 12.sp,
+                            color = DarkTextSecondary
+                        )
+                    }
+                }
+            }
+        }
+
         item {
             Spacer(modifier = Modifier.height(80.dp))
         }
@@ -526,7 +552,7 @@ fun FilterModalScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text("Cook Duration", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = DarkText)
-            Text("Under 30 mins", fontSize = 12.sp, color = DarkTextSecondary)
+            Text(if (filterState.selectedDuration.isNotEmpty()) filterState.selectedDuration else "Any duration", fontSize = 12.sp, color = DarkTextSecondary)
         }
         Spacer(modifier = Modifier.height(10.dp))
         Row(
@@ -624,7 +650,7 @@ fun FilterModalScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text("Meal Type", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = DarkText)
-            Text(filterState.selectedMealType, fontSize = 12.sp, color = DarkTextSecondary)
+            Text(if (filterState.selectedMealType.isNotEmpty()) filterState.selectedMealType else "All", fontSize = 12.sp, color = DarkTextSecondary)
         }
         Spacer(modifier = Modifier.height(10.dp))
         Row(
