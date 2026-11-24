@@ -569,7 +569,11 @@ fun UploadStep2Screen(
             }
 
             Button(
-                onClick = onPublishSuccess,
+                onClick = {
+                    viewModel.publishNewRecipe {
+                        onPublishSuccess()
+                    }
+                },
                 shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryYellow, contentColor = DarkText),
                 modifier = Modifier

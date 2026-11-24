@@ -22,8 +22,14 @@ interface RecipeDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(recipes: List<RecipeEntity>)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRecipe(recipe: RecipeEntity)
+
     @Query("UPDATE recipes SET isBookmarked = :isBookmarked WHERE id = :recipeId")
     suspend fun updateBookmark(recipeId: String, isBookmarked: Boolean): Int
+
+    @Query("DELETE FROM recipes WHERE id = :recipeId")
+    suspend fun deleteRecipe(recipeId: String): Int
 }
 
 @Dao

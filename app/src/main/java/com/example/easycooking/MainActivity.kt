@@ -186,7 +186,8 @@ fun EasyCookingApp(
                         viewModel = viewModel,
                         onSignInClick = { navController.navigate(Screen.Login.route) },
                         onDietaryPreferencesClick = { navController.navigate(Screen.DietaryAllergies.route) },
-                        onNewRecipeClick = { navController.navigate(Screen.UploadStep1.route) }
+                        onNewRecipeClick = { navController.navigate(Screen.UploadStep1.route) },
+                        onRecipeClick = { id -> navController.navigate(Screen.RecipeDetail.createRoute(id)) }
                     )
                 }
             }

@@ -256,7 +256,658 @@ class AppRepository(
         )
 
         seeds.forEach { inMemoryRecipes[it.id] = it }
-        _recipeReviewsFlow.value = seeds.associate { it.id to it.reviews }
+        val additional = createAdditionalSeeds()
+        additional.forEach { inMemoryRecipes[it.id] = it }
+        val allSeeds = seeds + additional
+        _recipeReviewsFlow.value = allSeeds.associate { it.id to it.reviews }
+    }
+
+    private fun ing(
+        id: String,
+        name: String,
+        subtitle: String,
+        amount: Double,
+        unit: String,
+        category: String,
+        allergenTags: List<String> = emptyList()
+    ): Ingredient = Ingredient(
+        id = id,
+        name = name,
+        subtitle = subtitle,
+        baseAmount = amount,
+        unit = unit,
+        category = category,
+        isChecked = false,
+        allergenTags = allergenTags
+    )
+
+    private fun createAdditionalSeeds(): List<Recipe> {
+        return listOf(
+            Recipe(
+                id = "7",
+                title = "Mediterranean Quinoa Salad",
+                chefName = "Chef Alex",
+                difficulty = "Easy",
+                durationMinutes = 15,
+                calories = 280,
+                rating = 4.8,
+                reviewCount = 112,
+                isBookmarked = false,
+                category = "Lunch",
+                dietaryBadges = listOf("Vegetarian", "Vegan", "Gluten-Free", "Nut-Free"),
+                allergens = emptyList(),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("7_1", "Cooked quinoa", "fluffy tri-color quinoa", 200.0, "g", "Pantry Essentials", emptyList()),
+                    ing("7_2", "English cucumber", "diced crisp cucumber", 1.0, "pcs", "Produce & Meat", emptyList()),
+                    ing("7_3", "Cherry tomatoes", "halved sweet tomatoes", 120.0, "g", "Produce & Meat", emptyList()),
+                    ing("7_4", "Kalamata olives", "pitted and sliced", 40.0, "g", "Specialty", emptyList()),
+                    ing("7_5", "Extra virgin olive oil", "cold pressed", 2.0, "tbsp", "Pantry Essentials", emptyList()),
+                    ing("7_6", "Fresh lemon juice", "freshly squeezed", 2.0, "tbsp", "Produce & Meat", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Cool Quinoa", "Spread warm cooked quinoa on a plate to cool to room temperature.", 3, false, "Cool quinoa prevents fresh diced vegetables from wilting."),
+                    RecipeStep(2, "Chop Produce", "Dice English cucumber and halve fresh cherry tomatoes evenly.", 5, false, "Uniform sizes give each forkful a balanced crunch."),
+                    RecipeStep(3, "Whisk & Toss", "Whisk olive oil, lemon juice, salt, and pepper in a bowl. Toss quinoa, vegetables, and olives together.", 2, true, "Serve chilled or at room temperature.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r7_1", "Liam N.", 5, "1d ago", "So fresh and vibrant! Perfect healthy lunch for work."),
+                    ReviewItem("r7_2", "Sophia B.", 5, "3d ago", "The lemon dressing pulls all the Mediterranean flavors together nicely.")
+                )
+            ),
+            Recipe(
+                id = "8",
+                title = "Classic Margherita Pizza",
+                chefName = "Chef Marco",
+                difficulty = "Medium",
+                durationMinutes = 25,
+                calories = 450,
+                rating = 4.9,
+                reviewCount = 260,
+                isBookmarked = false,
+                category = "Dinner",
+                dietaryBadges = listOf("Vegetarian", "Nut-Free"),
+                allergens = listOf("Gluten", "Dairy"),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("8_1", "Pizza dough", "fermented artisanal dough", 300.0, "g", "Pantry Essentials", listOf("Gluten")),
+                    ing("8_2", "San Marzano sauce", "crushed plum tomatoes", 100.0, "ml", "Pantry Essentials", emptyList()),
+                    ing("8_3", "Fresh mozzarella", "sliced buffalo mozzarella", 150.0, "g", "Dairy & Eggs", listOf("Dairy")),
+                    ing("8_4", "Fresh basil leaves", "sweet Italian basil", 10.0, "lembar", "Specialty", emptyList()),
+                    ing("8_5", "Olive oil", "extra virgin", 1.0, "tbsp", "Pantry Essentials", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Stretch Dough", "Gently stretch pizza dough into a 12-inch round on parchment paper.", 5, false, "Do not use a rolling pin; preserve airy dough bubbles."),
+                    RecipeStep(2, "Sauce & Top", "Spread crushed tomato sauce in concentric circles and scatter fresh mozzarella slices.", 3, false, "Avoid overloading with sauce to keep the crust crispy."),
+                    RecipeStep(3, "Bake High Heat", "Bake at 250C on a preheated pizza stone for 10-12 minutes until crust is puffed and blistered. Top with fresh basil.", 12, true, "Add fresh basil immediately after baking so it releases fragrant oils.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r8_1", "Antonio G.", 5, "2d ago", "Authentic Neapolitan taste! The crust puffed up beautifully."),
+                    ReviewItem("r8_2", "Emily V.", 5, "5d ago", "Simple ingredients done right. Best homemade pizza recipe.")
+                )
+            ),
+            Recipe(
+                id = "9",
+                title = "Wild Mushroom Risotto",
+                chefName = "Chef Elena Vance",
+                difficulty = "Medium",
+                durationMinutes = 35,
+                calories = 390,
+                rating = 4.7,
+                reviewCount = 145,
+                isBookmarked = false,
+                category = "Dinner",
+                dietaryBadges = listOf("Vegetarian", "Gluten-Free"),
+                allergens = listOf("Dairy"),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("9_1", "Arborio rice", "short-grain Italian rice", 180.0, "g", "Pantry Essentials", emptyList()),
+                    ing("9_2", "Wild mushrooms", "cremini and shiitake sliced", 200.0, "g", "Produce & Meat", emptyList()),
+                    ing("9_3", "Vegetable broth", "warm savory broth", 600.0, "ml", "Pantry Essentials", emptyList()),
+                    ing("9_4", "Grated parmesan", "aged cheese", 40.0, "g", "Dairy & Eggs", listOf("Dairy")),
+                    ing("9_5", "Butter", "cold unsalted cubes", 2.0, "tbsp", "Dairy & Eggs", listOf("Dairy")),
+                    ing("9_6", "Garlic", "finely minced", 2.0, "cloves", "Produce & Meat", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Saute Mushrooms", "Cook sliced mushrooms in butter until deep golden, then set half aside for garnish.", 6, false, "High heat gives mushrooms maximum savoriness."),
+                    RecipeStep(2, "Toast Rice", "Add arborio rice and minced garlic to pan, stirring 2 minutes until rice edges become translucent.", 3, false, "Toasting creates a protective shell so rice grains stay firm."),
+                    RecipeStep(3, "Simmer with Broth", "Ladle hot vegetable broth one cup at a time, stirring continuously until creamy and tender. Finish with cold butter and parmesan.", 20, true, "Vigorous stirring releases starches for an ultra-creamy risotto.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r9_1", "Chloe M.", 5, "3d ago", "Creamy, decadent, and deeply savory! Took some arm workout to stir but totally worth it."),
+                    ReviewItem("r9_2", "Julian P.", 4, "1w ago", "Great technique. The mushrooms add so much depth.")
+                )
+            ),
+            Recipe(
+                id = "10",
+                title = "Thai Coconut Tofu Curry",
+                chefName = "Chef Somchai",
+                difficulty = "Easy",
+                durationMinutes = 25,
+                calories = 340,
+                rating = 4.8,
+                reviewCount = 175,
+                isBookmarked = false,
+                category = "Dinner",
+                dietaryBadges = listOf("Vegan", "Vegetarian", "Gluten-Free", "Dairy-Free"),
+                allergens = listOf("Soy"),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("10_1", "Firm tofu", "pressed and cubed", 300.0, "g", "Produce & Meat", listOf("Soy")),
+                    ing("10_2", "Coconut milk", "full fat creamy milk", 250.0, "ml", "Pantry Essentials", emptyList()),
+                    ing("10_3", "Red curry paste", "authentic Thai paste", 2.0, "tbsp", "Specialty", emptyList()),
+                    ing("10_4", "Bell peppers", "sliced red and yellow", 100.0, "g", "Produce & Meat", emptyList()),
+                    ing("10_5", "Bamboo shoots", "tender sliced shoots", 50.0, "g", "Specialty", emptyList()),
+                    ing("10_6", "Coconut oil", "virgin oil", 1.0, "tbsp", "Pantry Essentials", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Crisp Tofu", "Pan-fry tofu cubes in coconut oil until golden and crisp on all sides.", 6, false, "Pressing water out of tofu ensures a delightfully crispy crust."),
+                    RecipeStep(2, "Simmer Curry Paste", "Fry red curry paste in pan until aromatic, then whisk in rich coconut milk.", 4, false, "Frying the paste releases its fragrant chili and herb oils."),
+                    RecipeStep(3, "Combine Vegetables", "Add bell peppers and bamboo shoots, simmer gently for 5 minutes, and return crispy tofu.", 6, true, "Serve warm with fragrant jasmine rice.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r10_1", "Maya K.", 5, "2d ago", "The curry sauce is restaurant-worthy! Wonderfully balanced spicy and sweet."),
+                    ReviewItem("r10_2", "Arthur L.", 5, "6d ago", "Crispy tofu soaked up all the red curry flavor beautifully.")
+                )
+            ),
+            Recipe(
+                id = "11",
+                title = "Crispy Chickpea Buddha Bowl",
+                chefName = "Chef Alex",
+                difficulty = "Easy",
+                durationMinutes = 20,
+                calories = 360,
+                rating = 4.9,
+                reviewCount = 130,
+                isBookmarked = false,
+                category = "Lunch",
+                dietaryBadges = listOf("Vegan", "Vegetarian", "Gluten-Free", "High Protein", "Dairy-Free"),
+                allergens = emptyList(),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("11_1", "Cooked chickpeas", "drained and dried", 250.0, "g", "Pantry Essentials", emptyList()),
+                    ing("11_2", "Fresh kale leaves", "stemmed and chopped", 100.0, "g", "Produce & Meat", emptyList()),
+                    ing("11_3", "Sweet potato", "cubed small", 150.0, "g", "Produce & Meat", emptyList()),
+                    ing("11_4", "Tahini paste", "pure sesame paste", 2.0, "tbsp", "Specialty", emptyList()),
+                    ing("11_5", "Lemon juice", "freshly squeezed", 1.0, "tbsp", "Produce & Meat", emptyList()),
+                    ing("11_6", "Olive oil", "extra virgin", 1.0, "tbsp", "Pantry Essentials", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Roast Chickpeas", "Toss chickpeas and sweet potato cubes with olive oil, paprika, and salt. Roast at 200C for 15 minutes.", 15, false, "Ensure chickpeas are completely dry so they crisp up."),
+                    RecipeStep(2, "Massage Kale", "Massage kale leaves with a drop of olive oil and salt for 1 minute until tender and dark green.", 2, false, "Massaging breaks down tough fibers for easy digestion."),
+                    RecipeStep(3, "Assemble Bowl", "Arrange roasted chickpeas, sweet potatoes, and kale in a bowl. Drizzle lemon tahini dressing generously.", 2, true, "High protein and nutrient packed clean fuel.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r11_1", "Olivia W.", 5, "1d ago", "My go-to meal prep lunch! Filling, colorful, and super healthy."),
+                    ReviewItem("r11_2", "Hannah T.", 5, "4d ago", "The roasted chickpeas add such an addictive crunch.")
+                )
+            ),
+            Recipe(
+                id = "12",
+                title = "Vanilla Chia Seed Pudding",
+                chefName = "Chef Alex",
+                difficulty = "Easy",
+                durationMinutes = 10,
+                calories = 210,
+                rating = 4.7,
+                reviewCount = 95,
+                isBookmarked = false,
+                category = "Breakfast",
+                dietaryBadges = listOf("Vegan", "Vegetarian", "Gluten-Free", "Dairy-Free"),
+                allergens = emptyList(),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("12_1", "Black chia seeds", "organic chia", 4.0, "tbsp", "Pantry Essentials", emptyList()),
+                    ing("12_2", "Oat milk", "unsweetened oat milk", 250.0, "ml", "Dairy & Eggs", emptyList()),
+                    ing("12_3", "Pure maple syrup", "grade A maple", 1.0, "tbsp", "Pantry Essentials", emptyList()),
+                    ing("12_4", "Vanilla extract", "pure bourbon vanilla", 1.0, "tsp", "Pantry Essentials", emptyList()),
+                    ing("12_5", "Fresh raspberries", "sweet ripe berries", 50.0, "g", "Produce & Meat", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Whisk Chia & Milk", "Whisk chia seeds, oat milk, maple syrup, and vanilla in a bowl until thoroughly combined.", 2, false, "Whisk vigorously to prevent chia seeds from clumping at the bottom."),
+                    RecipeStep(2, "Rest & Re-stir", "Let sit for 5 minutes, then give it another gentle stir to distribute seeds evenly.", 5, false, "A second stir prevents seed settling as gelatinous coating forms."),
+                    RecipeStep(3, "Chill & Top", "Cover and refrigerate until thickened. Top with vibrant raspberries before eating.", 3, true, "Rich in omega-3 and dietary fiber.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r12_1", "Grace F.", 5, "2d ago", "Smooth, creamy texture and so convenient to grab in the morning."),
+                    ReviewItem("r12_2", "Lucas D.", 4, "5d ago", "Great light breakfast. Added a spoonful of almond butter on top.")
+                )
+            ),
+            Recipe(
+                id = "13",
+                title = "Grilled Ribeye with Herb Butter",
+                chefName = "Chef Gordon",
+                difficulty = "Medium",
+                durationMinutes = 20,
+                calories = 580,
+                rating = 5.0,
+                reviewCount = 310,
+                isBookmarked = false,
+                category = "Dinner",
+                dietaryBadges = listOf("Keto", "Low Carb", "Gluten-Free", "High Protein"),
+                allergens = listOf("Dairy"),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("13_1", "Ribeye steak", "prime marbling cut", 450.0, "g", "Produce & Meat", emptyList()),
+                    ing("13_2", "Butter", "softened grass-fed butter", 3.0, "tbsp", "Dairy & Eggs", listOf("Dairy")),
+                    ing("13_3", "Fresh rosemary & thyme", "finely minced", 10.0, "g", "Specialty", emptyList()),
+                    ing("13_4", "Garlic", "crushed cloves", 3.0, "cloves", "Produce & Meat", emptyList()),
+                    ing("13_5", "Olive oil", "high smoke point", 1.0, "tbsp", "Pantry Essentials", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Temper & Season", "Let ribeye rest at room temp for 20 minutes, then season heavily with coarse sea salt and cracked pepper.", 5, false, "Cold meat straight from fridge lowers skillet temperature instantly."),
+                    RecipeStep(2, "Cast Iron Sear", "Sear ribeye in smoking hot cast iron skillet for 3 minutes per side until deeply caramelized.", 6, false, "Do not touch meat during sear to form a crusty exterior."),
+                    RecipeStep(3, "Butter Baste & Rest", "Add butter, garlic, and fresh herbs into pan. Tilt pan and spoon foaming butter over steak for 1 minute, then rest 5 minutes.", 5, true, "Resting allows muscle fibers to relax and retain rich juices.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r13_1", "Ethan H.", 5, "1d ago", "Perfection! The herb butter melts over the juicy steak creating an insane crust."),
+                    ReviewItem("r13_2", "Victor S.", 5, "4d ago", "Ultimate keto comfort meal. Restaurant quality steak at home.")
+                )
+            ),
+            Recipe(
+                id = "14",
+                title = "Bacon Wrapped Asparagus",
+                chefName = "Chef Maria",
+                difficulty = "Easy",
+                durationMinutes = 15,
+                calories = 220,
+                rating = 4.8,
+                reviewCount = 120,
+                isBookmarked = false,
+                category = "Snack",
+                dietaryBadges = listOf("Keto", "Low Carb", "Gluten-Free", "Dairy-Free"),
+                allergens = emptyList(),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("14_1", "Fresh asparagus", "woody ends trimmed", 200.0, "g", "Produce & Meat", emptyList()),
+                    ing("14_2", "Smoked bacon", "thin cut bacon slices", 6.0, "pcs", "Produce & Meat", emptyList()),
+                    ing("14_3", "Black pepper", "freshly cracked", 1.0, "tsp", "Pantry Essentials", emptyList()),
+                    ing("14_4", "Olive oil spray", "extra virgin", 1.0, "tsp", "Pantry Essentials", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Trim Asparagus", "Snap off tough woody bottom ends of asparagus spears.", 3, false, "Asparagus naturally snaps right where tender stalk begins."),
+                    RecipeStep(2, "Wrap Bacon", "Tightly wrap 3-4 asparagus spears together with a strip of bacon spiraling up the stalks.", 4, false, "Overlap bacon edges slightly so it stays wrapped during cooking."),
+                    RecipeStep(3, "Roast or Air Fry", "Roast at 200C for 8-10 minutes until bacon is crispy and asparagus is tender-crisp.", 8, true, "Turn halfway through for 360-degree bacon crispiness.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r14_1", "Nathan G.", 5, "2d ago", "Fantastic savory appetizer! Bacon was super crispy and asparagus tender."),
+                    ReviewItem("r14_2", "Amber Y.", 4, "5d ago", "So easy to make in the air fryer. Everyone devoured them in minutes.")
+                )
+            ),
+            Recipe(
+                id = "15",
+                title = "Garlic Butter Shrimp Skillet",
+                chefName = "Chef Maria",
+                difficulty = "Easy",
+                durationMinutes = 12,
+                calories = 290,
+                rating = 4.9,
+                reviewCount = 240,
+                isBookmarked = false,
+                category = "Dinner",
+                dietaryBadges = listOf("Keto", "Low Carb", "Pescatarian", "Gluten-Free", "High Protein"),
+                allergens = listOf("Shellfish", "Dairy"),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("15_1", "Jumbo shrimp", "peeled and deveined", 350.0, "g", "Produce & Meat", listOf("Shellfish")),
+                    ing("15_2", "Butter", "unsalted butter", 3.0, "tbsp", "Dairy & Eggs", listOf("Dairy")),
+                    ing("15_3", "Garlic", "finely minced", 4.0, "cloves", "Produce & Meat", emptyList()),
+                    ing("15_4", "Fresh lemon juice", "freshly squeezed", 2.0, "tbsp", "Produce & Meat", emptyList()),
+                    ing("15_5", "Parsley", "chopped fresh parsley", 10.0, "g", "Specialty", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Season Shrimp", "Pat peeled shrimp dry with paper towel and season with salt and pepper.", 2, false, "Dry shrimp sears quickly without turning rubbery."),
+                    RecipeStep(2, "Quick Sear", "Melt butter in a wide skillet, add shrimp and cook for 2 minutes per side until pink and opaque.", 4, false, "Shrimp cooks extremely fast; pull them off before they curl into tight rings."),
+                    RecipeStep(3, "Lemon Garlic Finish", "Stir minced garlic, lemon juice, and chopped parsley into the bubbling butter pan sauce for 1 minute.", 2, true, "Serve immediately spooning butter sauce over shrimp.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r15_1", "Dylan C.", 5, "1d ago", "Literally ready in 10 minutes and taste like heaven! Garlic lemon combo is killer."),
+                    ReviewItem("r15_2", "Jessica M.", 5, "3d ago", "Juicy, succulent shrimp bathed in glorious garlic butter. Will make weekly.")
+                )
+            ),
+            Recipe(
+                id = "16",
+                title = "Pan-Seared Chilean Sea Bass",
+                chefName = "Chef Maria",
+                difficulty = "Medium",
+                durationMinutes = 20,
+                calories = 320,
+                rating = 4.9,
+                reviewCount = 165,
+                isBookmarked = false,
+                category = "Dinner",
+                dietaryBadges = listOf("Pescatarian", "Gluten-Free", "Dairy-Free", "Low Carb"),
+                allergens = listOf("Fish"),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("16_1", "Chilean sea bass", "thick center-cut fillets", 350.0, "g", "Produce & Meat", listOf("Fish")),
+                    ing("16_2", "Olive oil", "extra virgin", 2.0, "tbsp", "Pantry Essentials", emptyList()),
+                    ing("16_3", "Garlic", "smashed cloves", 2.0, "cloves", "Produce & Meat", emptyList()),
+                    ing("16_4", "Fresh thyme", "fresh sprigs", 4.0, "pcs", "Specialty", emptyList()),
+                    ing("16_5", "Lemon wedges", "fresh organic lemon", 1.0, "pcs", "Produce & Meat", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Season Fillets", "Pat sea bass completely dry, brush with olive oil, and season generously with sea salt.", 4, false, "Sea bass is a buttery fish; high heat locks in natural oils."),
+                    RecipeStep(2, "Golden Pan Sear", "Sear fish in a hot stainless pan 4-5 minutes per side until a golden crust develops.", 8, false, "Wait until fish releases naturally before attempting to flip."),
+                    RecipeStep(3, "Herb Infusion", "Add garlic and thyme sprigs to warm pan oil, spooning fragrant oil over fish before plating.", 3, true, "Silky, buttery fish that melts on your tongue.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r16_1", "Robert E.", 5, "2d ago", "Melt-in-your-mouth tenderness! Better than seafood restaurants."),
+                    ReviewItem("r16_2", "Laura B.", 5, "6d ago", "Cooking sea bass can be intimidating but this guide made it flawless.")
+                )
+            ),
+            Recipe(
+                id = "17",
+                title = "Baja Crispy Fish Tacos",
+                chefName = "Chef Carlos",
+                difficulty = "Easy",
+                durationMinutes = 25,
+                calories = 410,
+                rating = 4.8,
+                reviewCount = 220,
+                isBookmarked = false,
+                category = "Lunch",
+                dietaryBadges = listOf("Pescatarian", "High Protein"),
+                allergens = listOf("Fish", "Gluten"),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("17_1", "Cod fish fillets", "fresh wild cod cut into strips", 300.0, "g", "Produce & Meat", listOf("Fish")),
+                    ing("17_2", "Tortillas", "warm soft corn tortillas", 4.0, "pcs", "Pantry Essentials", listOf("Gluten")),
+                    ing("17_3", "Cabbage slaw", "shredded red & white cabbage", 100.0, "g", "Produce & Meat", emptyList()),
+                    ing("17_4", "Chipotle crema", "spicy smoky cream", 3.0, "tbsp", "Specialty", emptyList()),
+                    ing("17_5", "Fresh lime", "juicy wedges", 1.0, "pcs", "Produce & Meat", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Cook Fish Strips", "Dust cod strips with taco seasoning and pan-sear in hot oil for 3 minutes per side until crispy.", 6, false, "Cod stays flaky and juicy when cooked quickly over high heat."),
+                    RecipeStep(2, "Warm Tortillas", "Warm soft tortillas on a dry skillet for 30 seconds per side until pliable.", 2, false, "Warming tortillas prevents them from tearing under taco fillings."),
+                    RecipeStep(3, "Assemble Tacos", "Fill tortillas with crispy cod, crunchy cabbage slaw, chipotle crema, and fresh squeeze of lime.", 3, true, "Zesty, crunchy, and packed with fresh Mexican coastal flavor.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r17_1", "Carlos M.", 5, "1d ago", "Tastes just like the authentic street tacos in Ensenada! Amazing."),
+                    ReviewItem("r17_2", "Serena K.", 5, "4d ago", "The chipotle crema pairs insanely well with the crunchy cabbage and tender fish.")
+                )
+            ),
+            Recipe(
+                id = "18",
+                title = "Seared Scallops with Lemon Herb",
+                chefName = "Chef Elena Vance",
+                difficulty = "Medium",
+                durationMinutes = 15,
+                calories = 260,
+                rating = 4.9,
+                reviewCount = 190,
+                isBookmarked = false,
+                category = "Dinner",
+                dietaryBadges = listOf("Pescatarian", "Gluten-Free", "Low Carb", "Dairy-Free"),
+                allergens = listOf("Shellfish"),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("18_1", "Sea scallops", "dry sea scallops", 300.0, "g", "Produce & Meat", listOf("Shellfish")),
+                    ing("18_2", "Extra virgin olive oil", "cold pressed", 2.0, "tbsp", "Pantry Essentials", emptyList()),
+                    ing("18_3", "Garlic", "finely minced", 2.0, "cloves", "Produce & Meat", emptyList()),
+                    ing("18_4", "Lemon juice", "freshly squeezed", 1.0, "tbsp", "Produce & Meat", emptyList()),
+                    ing("18_5", "Fresh parsley", "finely chopped", 10.0, "g", "Specialty", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Dry Scallops", "Thoroughly pat scallops dry with multiple paper towels and season with sea salt.", 3, false, "Any surface moisture creates steam and prevents that deep golden sear."),
+                    RecipeStep(2, "Hot Pan Sear", "Heat oil until shimmering. Place scallops without touching and sear undisturbed for 2 minutes.", 4, false, "Do not move scallops until a golden crust is formed on bottom."),
+                    RecipeStep(3, "Glaze with Pan Juices", "Flip for 1 minute, swirl in minced garlic, lemon juice, and parsley, then transfer to warm plate.", 2, true, "Scallops should remain translucent and buttery in the middle.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r18_1", "Patrick W.", 5, "3d ago", "Followed the drying tip and got the most gorgeous golden crust ever!"),
+                    ReviewItem("r18_2", "Monica D.", 5, "1w ago", "Light, elegant, and ready in 15 minutes flat.")
+                )
+            ),
+            Recipe(
+                id = "19",
+                title = "Teriyaki Beef Bowl",
+                chefName = "Chef Kenji",
+                difficulty = "Easy",
+                durationMinutes = 20,
+                calories = 460,
+                rating = 4.8,
+                reviewCount = 280,
+                isBookmarked = false,
+                category = "Dinner",
+                dietaryBadges = listOf("High Protein", "Dairy-Free"),
+                allergens = listOf("Soy"),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("19_1", "Beef sirloin", "thinly sliced against grain", 350.0, "g", "Produce & Meat", emptyList()),
+                    ing("19_2", "Teriyaki sauce", "authentic soy & mirin glaze", 60.0, "ml", "Pantry Essentials", listOf("Soy")),
+                    ing("19_3", "Steamed rice", "warm jasmine rice", 250.0, "g", "Pantry Essentials", emptyList()),
+                    ing("19_4", "Broccoli florets", "steamed tender-crisp", 150.0, "g", "Produce & Meat", emptyList()),
+                    ing("19_5", "Sesame seeds", "toasted white seeds", 1.0, "tsp", "Specialty", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "High-Heat Beef Sear", "Stir-fry beef slices in a smoking hot wok for 3 minutes until browned on all edges.", 4, false, "Cooking in small batches prevents beef from steaming in juices."),
+                    RecipeStep(2, "Glaze with Teriyaki", "Pour teriyaki sauce over hot beef, tossing rapidly until sauce reduces into a glossy lacquer.", 3, false, "Simmer until sauce bubbles thick and clings to beef slices."),
+                    RecipeStep(3, "Assemble Bowl", "Spoon warm jasmine rice into bowls, top with glossy teriyaki beef, steamed broccoli, and sesame seeds.", 3, true, "Savory, sweet, and satisfying high-protein bowl.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r19_1", "Jason B.", 5, "2d ago", "The homemade teriyaki glaze is ten times better than takeout!"),
+                    ReviewItem("r19_2", "Kelly N.", 5, "5d ago", "Super fast weeknight meal. Meat stayed tender and sauce is phenomenal.")
+                )
+            ),
+            Recipe(
+                id = "20",
+                title = "Mango Dragonfruit Smoothie Bowl",
+                chefName = "Chef Alex",
+                difficulty = "Easy",
+                durationMinutes = 8,
+                calories = 190,
+                rating = 4.9,
+                reviewCount = 105,
+                isBookmarked = false,
+                category = "Breakfast",
+                dietaryBadges = listOf("Vegan", "Vegetarian", "Gluten-Free", "Dairy-Free"),
+                allergens = emptyList(),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("20_1", "Frozen mango", "sweet ripe mango chunks", 150.0, "g", "Produce & Meat", emptyList()),
+                    ing("20_2", "Red dragonfruit", "frozen puree packet", 100.0, "g", "Specialty", emptyList()),
+                    ing("20_3", "Coconut water", "pure chilled coconut water", 100.0, "ml", "Dairy & Eggs", emptyList()),
+                    ing("20_4", "Kiwi fruit", "peeled and sliced", 1.0, "pcs", "Produce & Meat", emptyList()),
+                    ing("20_5", "Coconut flakes", "toasted unsweetened", 15.0, "g", "Specialty", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Blend Fruit", "Blend frozen mango, dragonfruit puree, and cold coconut water on high speed until ultra-thick.", 3, false, "Minimal liquid keeps smoothie bowl thick and spoonable."),
+                    RecipeStep(2, "Fill Bowl", "Pour vibrant magenta smoothie into cold bowls, smoothing surface.", 1, false, "Use frozen fruits only for maximum thickness without melting."),
+                    RecipeStep(3, "Garnish Toppings", "Decorate top with sliced kiwi wheels and crunchy toasted coconut flakes.", 2, true, "Electrolyte-rich tropical antioxidant breakfast.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r20_1", "Zoe R.", 5, "1d ago", "The color is so vibrant and stunning! Tastes like pure tropical sunshine."),
+                    ReviewItem("r20_2", "Benjamin K.", 5, "4d ago", "So refreshing after morning runs. The coconut flakes give great texture.")
+                )
+            ),
+            Recipe(
+                id = "21",
+                title = "Slow-Cooked Beef Stew",
+                chefName = "Chef Gordon",
+                difficulty = "Hard",
+                durationMinutes = 90,
+                calories = 510,
+                rating = 4.9,
+                reviewCount = 340,
+                isBookmarked = false,
+                category = "Dinner",
+                dietaryBadges = listOf("Gluten-Free", "Dairy-Free", "High Protein"),
+                allergens = emptyList(),
+                defaultServings = 4,
+                ingredients = listOf(
+                    ing("21_1", "Beef chuck", "trimmed and cut in large cubes", 600.0, "g", "Produce & Meat", emptyList()),
+                    ing("21_2", "Carrots", "chunky cut carrots", 200.0, "g", "Produce & Meat", emptyList()),
+                    ing("21_3", "Baby potatoes", "halved golden potatoes", 250.0, "g", "Produce & Meat", emptyList()),
+                    ing("21_4", "Beef bone broth", "rich homemade bone broth", 500.0, "ml", "Pantry Essentials", emptyList()),
+                    ing("21_5", "Tomato paste", "concentrated paste", 2.0, "tbsp", "Pantry Essentials", emptyList()),
+                    ing("21_6", "Rosemary & thyme", "fresh whole sprigs", 15.0, "g", "Specialty", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Brown Beef", "Sear seasoned beef cubes in a heavy Dutch oven until deeply caramelized on all sides.", 8, false, "Browning creates fond at bottom of pot that flavors entire stew."),
+                    RecipeStep(2, "Deglaze & Simmer", "Stir tomato paste into pot, deglaze bottom with beef broth, and bring to gentle simmer.", 5, false, "Scrape every bit of brown crust off bottom of pot with wooden spoon."),
+                    RecipeStep(3, "Slow Braise", "Add carrots, potatoes, and herb bundle. Cover pot and simmer low heat for 75 minutes until fork tender.", 75, true, "Low and slow breaks down connective tissues making beef melt like butter.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r21_1", "Thomas C.", 5, "3d ago", "Incredible depth of flavor! The beef literally fell apart with a fork."),
+                    ReviewItem("r21_2", "Angela L.", 5, "1w ago", "Ultimate rainy day comfort meal. Broth was rich, thick, and hearty.")
+                )
+            ),
+            Recipe(
+                id = "22",
+                title = "Turkey & Sweet Potato Skillet",
+                chefName = "Chef Alex",
+                difficulty = "Easy",
+                durationMinutes = 25,
+                calories = 440,
+                rating = 4.8,
+                reviewCount = 155,
+                isBookmarked = false,
+                category = "Lunch",
+                dietaryBadges = listOf("High Protein", "Gluten-Free", "Dairy-Free"),
+                allergens = emptyList(),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("22_1", "Ground turkey", "93% lean ground turkey", 400.0, "g", "Produce & Meat", emptyList()),
+                    ing("22_2", "Sweet potato", "diced 1/2 inch cubes", 250.0, "g", "Produce & Meat", emptyList()),
+                    ing("22_3", "Bell peppers", "diced green and red", 100.0, "g", "Produce & Meat", emptyList()),
+                    ing("22_4", "Olive oil", "extra virgin", 1.0, "tbsp", "Pantry Essentials", emptyList()),
+                    ing("22_5", "Smoked paprika", "Spanish smoked paprika", 1.0, "tbsp", "Pantry Essentials", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Steam-Saute Potatoes", "Cook sweet potato cubes in covered skillet with olive oil and splash of water for 8 minutes.", 8, false, "Covering pan traps steam to cook potatoes tender without burning."),
+                    RecipeStep(2, "Brown Turkey", "Push potatoes aside, add ground turkey and smoked paprika, breaking up meat until browned.", 6, false, "Smoked paprika adds a savory, bacon-like aroma to lean turkey."),
+                    RecipeStep(3, "Toss Together", "Add diced bell peppers and toss everything in pan for 3 minutes until peppers are tender.", 3, true, "Ideal balanced lunch with complex carbs and clean protein.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r22_1", "Aaron S.", 5, "2d ago", "Healthy meal prep dream! Balanced, flavorful, and keeps great in fridge."),
+                    ReviewItem("r22_2", "Danielle W.", 4, "4d ago", "The sweet potatoes paired with smoked paprika are phenomenal.")
+                )
+            ),
+            Recipe(
+                id = "23",
+                title = "Protein Greek Yogurt Parfait",
+                chefName = "Chef Alex",
+                difficulty = "Easy",
+                durationMinutes = 5,
+                calories = 280,
+                rating = 4.9,
+                reviewCount = 180,
+                isBookmarked = false,
+                category = "Breakfast",
+                dietaryBadges = listOf("Vegetarian", "High Protein", "Gluten-Free"),
+                allergens = listOf("Dairy"),
+                defaultServings = 1,
+                ingredients = listOf(
+                    ing("23_1", "Greek yogurt", "plain whole milk Greek yogurt", 200.0, "g", "Dairy & Eggs", listOf("Dairy")),
+                    ing("23_2", "Fresh berries", "strawberries & blueberries", 80.0, "g", "Produce & Meat", emptyList()),
+                    ing("23_3", "Raw honey", "pure wildflower honey", 1.0, "tbsp", "Pantry Essentials", emptyList()),
+                    ing("23_4", "Gluten-free granola", "oats and seeds", 30.0, "g", "Pantry Essentials", emptyList()),
+                    ing("23_5", "Chia seeds", "black chia", 1.0, "tsp", "Pantry Essentials", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Layer Yogurt", "Spoon half the chilled Greek yogurt into a glass jar or bowl.", 1, false, "Greek yogurt packs 20g of natural protein to keep you satiated."),
+                    RecipeStep(2, "Add Fruit & Granola", "Layer fresh berries, crunchy granola, and sprinkle chia seeds in center.", 2, false, "Layering keeps granola crisp until the very last bite."),
+                    RecipeStep(3, "Honey Drizzle", "Top with remaining yogurt, berries, and finish with a golden drizzle of raw honey.", 1, true, "5-minute breakfast power bowl.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r23_1", "Tiffany L.", 5, "1d ago", "Quick, filling, and packed with protein. Keeps me full until lunch!"),
+                    ReviewItem("r23_2", "Mark O.", 5, "3d ago", "Creamy yogurt with crunchy granola and sweet berries is the best combo.")
+                )
+            ),
+            Recipe(
+                id = "24",
+                title = "Crispy Roasted Chickpeas",
+                chefName = "Chef Alex",
+                difficulty = "Easy",
+                durationMinutes = 30,
+                calories = 180,
+                rating = 4.7,
+                reviewCount = 88,
+                isBookmarked = false,
+                category = "Snack",
+                dietaryBadges = listOf("Vegan", "Vegetarian", "Gluten-Free", "Dairy-Free", "High Protein"),
+                allergens = emptyList(),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("24_1", "Cooked chickpeas", "rinsed and dried", 300.0, "g", "Pantry Essentials", emptyList()),
+                    ing("24_2", "Olive oil", "extra virgin", 1.0, "tbsp", "Pantry Essentials", emptyList()),
+                    ing("24_3", "Smoked paprika", "Spanish paprika", 1.0, "tsp", "Pantry Essentials", emptyList()),
+                    ing("24_4", "Ground cumin", "warm fragrant cumin", 1.0, "tsp", "Pantry Essentials", emptyList()),
+                    ing("24_5", "Sea salt", "fine sea salt", 1.0, "tsp", "Pantry Essentials", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Dry Thoroughly", "Roll chickpeas gently between paper towels to remove skins and every drop of moisture.", 5, false, "Removing loose skins helps them become extraordinarily crunchy."),
+                    RecipeStep(2, "Season & Coat", "Toss chickpeas with olive oil, paprika, cumin, and sea salt until evenly coated.", 2, false, "Do not oversaturate with oil or they will soften rather than crisp."),
+                    RecipeStep(3, "Bake Until Crunchy", "Roast at 200C on a large sheet pan for 22 minutes shaking pan halfway.", 22, true, "Leave in cooling oven for 10 minutes to finish drying out.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r24_1", "Eric M.", 5, "2d ago", "Insanely crunchy! Better and healthier alternative to potato chips."),
+                    ReviewItem("r24_2", "Natalie H.", 4, "5d ago", "Spiced just right. Great high-fiber, high-protein midday snack.")
+                )
+            ),
+            Recipe(
+                id = "25",
+                title = "Baked Zucchini Parmesan Crisps",
+                chefName = "Chef Maria",
+                difficulty = "Easy",
+                durationMinutes = 20,
+                calories = 150,
+                rating = 4.8,
+                reviewCount = 110,
+                isBookmarked = false,
+                category = "Snack",
+                dietaryBadges = listOf("Vegetarian", "Keto", "Low Carb", "Gluten-Free"),
+                allergens = listOf("Dairy"),
+                defaultServings = 2,
+                ingredients = listOf(
+                    ing("25_1", "Zucchini", "sliced into 1/4 inch rounds", 250.0, "g", "Produce & Meat", emptyList()),
+                    ing("25_2", "Parmesan cheese", "freshly grated", 50.0, "g", "Dairy & Eggs", listOf("Dairy")),
+                    ing("25_3", "Italian herbs", "dried oregano and basil", 1.0, "tsp", "Pantry Essentials", emptyList()),
+                    ing("25_4", "Garlic powder", "pure garlic powder", 1.0, "tsp", "Pantry Essentials", emptyList()),
+                    ing("25_5", "Olive oil spray", "fine mist", 1.0, "tsp", "Pantry Essentials", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Slice Zucchini", "Slice fresh zucchini into uniform 1/4 inch rounds and pat surface dry.", 4, false, "Uniform slices bake at identical rates for uniform crunch."),
+                    RecipeStep(2, "Coat with Parmesan", "Dip zucchini rounds in mist of oil and press firmly into grated parmesan seasoned with herbs.", 4, false, "Press parmesan firmly so it forms a melted golden crust on each round."),
+                    RecipeStep(3, "Bake Golden", "Bake at 220C on parchment for 12 minutes until cheese is golden brown and bubbly.", 12, true, "Let cool 3 minutes on sheet to allow cheese crust to crisp up.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r25_1", "Sandra K.", 5, "1d ago", "Guilt-free keto chips! The parmesan crust gets super crispy."),
+                    ReviewItem("r25_2", "Justin T.", 5, "3d ago", "Simple, low carb, and delicious. My kids ate the whole tray.")
+                )
+            ),
+            Recipe(
+                id = "26",
+                title = "Spinach & Feta Omelette",
+                chefName = "Chef Maria",
+                difficulty = "Easy",
+                durationMinutes = 12,
+                calories = 310,
+                rating = 4.8,
+                reviewCount = 195,
+                isBookmarked = false,
+                category = "Breakfast",
+                dietaryBadges = listOf("Vegetarian", "Keto", "Low Carb", "Gluten-Free", "High Protein"),
+                allergens = listOf("Eggs", "Dairy"),
+                defaultServings = 1,
+                ingredients = listOf(
+                    ing("26_1", "Fresh eggs", "large free-range eggs", 3.0, "pcs", "Dairy & Eggs", listOf("Eggs")),
+                    ing("26_2", "Feta cheese", "crumbled Greek feta", 40.0, "g", "Dairy & Eggs", listOf("Dairy")),
+                    ing("26_3", "Baby spinach", "washed fresh spinach", 60.0, "g", "Produce & Meat", emptyList()),
+                    ing("26_4", "Olive oil", "extra virgin", 1.0, "tbsp", "Pantry Essentials", emptyList()),
+                    ing("26_5", "Black pepper", "freshly ground", 1.0, "tsp", "Pantry Essentials", emptyList())
+                ),
+                steps = listOf(
+                    RecipeStep(1, "Wilt Spinach", "Heat olive oil in non-stick pan, add baby spinach and cook for 1 minute until wilted.", 2, false, "Wilting spinach beforehand releases liquid so omelette stays fluffy."),
+                    RecipeStep(2, "Cook Eggs", "Whisk eggs with pepper, pour over spinach in pan, and swirl on medium-low heat until edges set.", 4, false, "Low and slow heat yields creamy velvety curds without browning."),
+                    RecipeStep(3, "Fold with Feta", "Scatter crumbled feta cheese over half of omelette, fold over gently, and slide onto plate.", 2, true, "Serve warm with rich melted feta inside.")
+                ),
+                reviews = listOf(
+                    ReviewItem("r26_1", "Vanessa R.", 5, "2d ago", "The salty feta with wilted spinach is a classic breakfast match! Fluffy and rich."),
+                    ReviewItem("r26_2", "Gregory P.", 5, "4d ago", "Takes 10 minutes and keeps me fueled throughout entire morning.")
+                )
+            )
+        )
     }
 
     suspend fun seedDatabaseIfEmpty() = withContext(ioDispatcher) {
@@ -440,6 +1091,38 @@ class AppRepository(
                 reviewCount = r.reviewCount + 1
             )
         }
+    }
+
+    suspend fun publishUserRecipe(recipe: Recipe) = withContext(ioDispatcher) {
+        inMemoryRecipes[recipe.id] = recipe
+        val currentReviews = _recipeReviewsFlow.value.toMutableMap()
+        currentReviews[recipe.id] = recipe.reviews
+        _recipeReviewsFlow.value = currentReviews
+
+        val entity = RecipeEntity(
+            id = recipe.id,
+            title = recipe.title,
+            chefName = recipe.chefName,
+            difficulty = recipe.difficulty,
+            durationMinutes = recipe.durationMinutes,
+            calories = recipe.calories,
+            rating = recipe.rating,
+            reviewCount = recipe.reviewCount,
+            isBookmarked = recipe.isBookmarked,
+            category = recipe.category,
+            dietaryBadgesRaw = recipe.dietaryBadges.joinToString(","),
+            allergensRaw = recipe.allergens.joinToString(","),
+            defaultServings = recipe.defaultServings
+        )
+        recipeDao.insertRecipe(entity)
+    }
+
+    suspend fun deleteUserRecipe(recipeId: String) = withContext(ioDispatcher) {
+        inMemoryRecipes.remove(recipeId)
+        val currentReviews = _recipeReviewsFlow.value.toMutableMap()
+        currentReviews.remove(recipeId)
+        _recipeReviewsFlow.value = currentReviews
+        recipeDao.deleteRecipe(recipeId)
     }
 
     suspend fun registerUser(fullName: String, email: String, password: String): Result<Unit> = withContext(ioDispatcher) {

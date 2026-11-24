@@ -8,7 +8,9 @@ import androidx.lifecycle.viewModelScope
 import com.example.easycooking.data.repository.AppRepository
 import com.example.easycooking.model.FilterState
 import com.example.easycooking.model.GroceryList
+import com.example.easycooking.model.Ingredient
 import com.example.easycooking.model.Recipe
+import com.example.easycooking.model.RecipeStep
 import com.example.easycooking.model.ReviewItem
 import com.example.easycooking.navigation.BottomTab
 import kotlinx.coroutines.Dispatchers
@@ -390,6 +392,92 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             repository.deleteAccount()
             onSuccess()
+        }
+    }
+
+    fun publishNewRecipe(onSuccess: () -> Unit) {
+        val title = _newRecipeTitle.value.ifBlank { "Homemade Specialty Recipe" }
+        val author = loggedInName.value.ifBlank { "My Cooking" }
+        val servings = _newRecipeServings.value
+        val durationText = _newRecipeDuration.value
+        val durationMinutes = when {
+            durationText.contains("< 15", ignoreCase = true) -> 15
+            durationText.contains("45", ignoreCase = true) -> 45
+            else -> 30
+        }
+        val rawIngredients = _newRecipeIngredients.value
+        val recipeId = "user_rec_${System.currentTimeMillis()}"
+
+        val ingredientsList = rawIngredients.mapIndexed { idx, ingName ->
+            Ingredient(
+                id = "${recipeId}_$idx",
+                name = ingName,
+                subtitle = "Fresh ingredient",
+                baseAmount = 1.0,
+                unit = "portion",
+                category = "Pantry Essentials",
+                isChecked = false,
+                allergenTags = emptyList()
+            )
+        }
+
+        val stepsList = listOf(
+            RecipeStep(
+                stepNumber = 1,
+                title = "Prep & Sear",
+                description = "Prepare all fresh ingredients and sear or saute in skillet until golden and fragrant.",
+                durationMinutes = 5,
+                isFinalStep = false,
+                tip = "Keep the pan at medium heat for even browning."
+            ),
+            RecipeStep(
+                stepNumber = 2,
+                title = "Simmer & Season",
+                description = "Combine all ingredients, simmer gently until thoroughly cooked, and season to taste.",
+                durationMinutes = durationMinutes - 5,
+                isFinalStep = true,
+                tip = "Taste before serving and adjust seasoning."
+            )
+        )
+
+        val newRecipe = Recipe(
+            id = recipeId,
+            title = title,
+            chefName = author,
+            difficulty = "Medium",
+            durationMinutes = durationMinutes,
+            calories = 380,
+            rating = 5.0,
+            reviewCount = 1,
+            isBookmarked = true,
+            category = "Dinner",
+            dietaryBadges = listOf("Gluten-Free"),
+            allergens = emptyList(),
+            defaultServings = servings,
+            ingredients = ingredientsList,
+            steps = stepsList,
+            reviews = listOf(
+                ReviewItem(
+                    id = "rev_init_${System.currentTimeMillis()}",
+                    userName = author,
+                    rating = 5,
+                    timeAgo = "Just now",
+                    comment = "Created and published with love!"
+                )
+            )
+        )
+
+        viewModelScope.launch {
+            repository.publishUserRecipe(newRecipe)
+            _newRecipeTitle.value = "New Homemade Recipe"
+            _newRecipeIngredients.value = listOf("1 tbsp Olive Oil", "Fresh Ingredients")
+            onSuccess()
+        }
+    }
+
+    fun deleteRecipe(recipeId: String) {
+        viewModelScope.launch {
+            repository.deleteUserRecipe(recipeId)
         }
     }
 }

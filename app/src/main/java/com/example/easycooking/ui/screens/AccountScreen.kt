@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
@@ -74,7 +75,8 @@ fun AccountScreen(
     viewModel: CookingViewModel,
     onSignInClick: () -> Unit,
     onDietaryPreferencesClick: () -> Unit,
-    onNewRecipeClick: () -> Unit
+    onNewRecipeClick: () -> Unit,
+    onRecipeClick: (String) -> Unit = {}
 ) {
     var isCreatorMode by remember { mutableStateOf(false) }
     var offlineBannerVisible by remember { mutableStateOf(true) }
@@ -83,6 +85,7 @@ fun AccountScreen(
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
     val loggedInName by viewModel.loggedInName.collectAsState()
     val loggedInEmail by viewModel.loggedInEmail.collectAsState()
+    val allRecipes by viewModel.recipes.collectAsState()
     var showAuthDialog by remember { mutableStateOf(false) }
     var authDialogReason by remember { mutableStateOf("") }
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
@@ -458,6 +461,10 @@ fun AccountScreen(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
+            val myPublishedRecipes = allRecipes.filter {
+                it.chefName.equals(loggedInName, ignoreCase = true) || it.id.startsWith("user_rec_")
+            }
+
             item {
                 TabRow(
                     selectedTabIndex = selectedTab,
@@ -473,41 +480,79 @@ fun AccountScreen(
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        text = { Text("Published (5)", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                        text = { Text("Published (${myPublishedRecipes.size})", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
                     )
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = { Text("Drafts (2)", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                        text = { Text("Drafts (0)", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
                     )
                 }
                 Spacer(modifier = Modifier.height(14.dp))
             }
 
-            items(creatorRecipes) { (recipeName, recipeMeta, recipeRating) ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 5.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(LightGrayBg)
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(52.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFFCBD5E1))
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(recipeName, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DarkText)
-                        Text(recipeMeta, fontSize = 11.sp, color = DarkTextSecondary)
+            if (selectedTab == 0) {
+                if (myPublishedRecipes.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("Belum ada resep yang dipublikasikan", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = DarkText)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text("Mulai unggah resep masakan Anda sekarang.", fontSize = 12.sp, color = DarkTextSecondary)
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Button(
+                                    onClick = onNewRecipeClick,
+                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryYellow, contentColor = DarkText),
+                                    shape = RoundedCornerShape(20.dp)
+                                ) {
+                                    Text("+ Buat Resep Baru", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(recipeRating, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DarkText)
-                        Icon(Icons.Filled.Star, contentDescription = null, tint = StarYellow, modifier = Modifier.size(14.dp))
+                } else {
+                    items(myPublishedRecipes) { recipe ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 5.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(LightGrayBg)
+                                .clickable { onRecipeClick(recipe.id) }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFFCBD5E1)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Filled.Restaurant, contentDescription = null, tint = DarkTextSecondary, modifier = Modifier.size(24.dp))
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(recipe.title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                                Text("${recipe.category} | ${recipe.durationMinutes}m | Published", fontSize = 11.sp, color = DarkTextSecondary)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(recipe.rating.toString(), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                                Icon(Icons.Filled.Star, contentDescription = null, tint = StarYellow, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                IconButton(
+                                    onClick = { viewModel.deleteRecipe(recipe.id) },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(Icons.Filled.Delete, contentDescription = "Hapus", tint = Color(0xFFDC2626), modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
                     }
                 }
             }
