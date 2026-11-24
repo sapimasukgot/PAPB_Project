@@ -361,9 +361,10 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun addReview(recipeId: String, rating: Int, comment: String) {
+        val authorName = loggedInName.value.ifBlank { "Pengguna" }
         val newReview = ReviewItem(
             id = "rev_${System.currentTimeMillis()}",
-            userName = "Alex Morgan",
+            userName = authorName,
             rating = rating,
             timeAgo = "Just now",
             comment = comment

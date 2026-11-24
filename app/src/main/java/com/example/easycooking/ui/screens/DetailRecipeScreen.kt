@@ -514,9 +514,9 @@ fun RecipeDetailScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Filled.Star, contentDescription = null, tint = StarYellow, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("4.8 / 5.0", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = DarkText)
+                                Text("${recipe.rating} / 5.0", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = DarkText)
                             }
-                            Text("420 foodies cooked this", fontSize = 11.sp, color = DarkTextSecondary)
+                            Text("${recipe.reviewCount} foodies cooked this", fontSize = 11.sp, color = DarkTextSecondary)
                         }
 
                         OutlinedButton(
@@ -536,6 +536,12 @@ fun RecipeDetailScreen(
                 }
             } else {
                 item {
+                    val totalReviews = recipe.reviews.size.coerceAtLeast(1).toFloat()
+                    val starDistribution = listOf(5, 4, 3, 2, 1).map { star ->
+                        val count = recipe.reviews.count { it.rating == star }
+                        Pair(star, count.toFloat() / totalReviews)
+                    }
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -549,25 +555,30 @@ fun RecipeDetailScreen(
                             modifier = Modifier.padding(end = 16.dp)
                         ) {
                             Text(
-                                text = "4.8",
+                                text = "${recipe.rating}",
                                 fontSize = 36.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = DarkText
                             )
                             Row {
-                                repeat(5) {
-                                    Icon(Icons.Filled.Star, contentDescription = null, tint = StarYellow, modifier = Modifier.size(14.dp))
+                                repeat(5) { starIndex ->
+                                    Icon(
+                                        Icons.Filled.Star,
+                                        contentDescription = null,
+                                        tint = if (starIndex < recipe.rating.toInt()) StarYellow else Color.LightGray,
+                                        modifier = Modifier.size(14.dp)
+                                    )
                                 }
                             }
                             Text(
-                                text = "42 reviews",
+                                text = "${recipe.reviews.size} reviews",
                                 fontSize = 11.sp,
                                 color = DarkTextSecondary
                             )
                         }
 
                         Column(modifier = Modifier.weight(1f)) {
-                            listOf(Pair(5, 0.85f), Pair(4, 0.12f), Pair(3, 0.03f), Pair(2, 0.0f), Pair(1, 0.0f)).forEach { (star, pct) ->
+                            starDistribution.forEach { (star, pct) ->
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(vertical = 1.dp)
