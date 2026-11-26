@@ -1,8 +1,14 @@
 package com.example.easycooking.ui.screens
 
 import android.app.Activity
+import android.content.Intent
 import android.view.WindowManager
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,11 +22,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -28,28 +37,28 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -60,6 +69,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,14 +80,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.easycooking.model.Recipe
+import com.example.easycooking.model.AlarmSoundPreset
+import com.example.easycooking.model.ExportGroceryResult
+import com.example.easycooking.model.ScalingMode
+import com.example.easycooking.ui.components.AlarmSoundPickerDialog
+import com.example.easycooking.ui.components.ExportGroceryResultDialog
 import com.example.easycooking.ui.components.PrimaryYellowButton
+import com.example.easycooking.ui.components.RecipeImageBox
+import com.example.easycooking.ui.theme.AmberBadgeBg
+import com.example.easycooking.ui.theme.AmberBadgeText
 import com.example.easycooking.ui.theme.BorderGray
 import com.example.easycooking.ui.theme.DarkText
 import com.example.easycooking.ui.theme.DarkTextSecondary
+import com.example.easycooking.ui.theme.GreenSuccessBg
+import com.example.easycooking.ui.theme.GreenSuccessText
 import com.example.easycooking.ui.theme.LightGrayBg
 import com.example.easycooking.ui.theme.PrimaryYellow
 import com.example.easycooking.ui.theme.StarYellow
+import com.example.easycooking.ui.theme.TipBannerBg
+import com.example.easycooking.ui.theme.TipBannerText
 import com.example.easycooking.viewmodel.CookingViewModel
 
 @Composable
@@ -85,28 +106,60 @@ fun RecipeDetailScreen(
     recipeId: String,
     viewModel: CookingViewModel,
     onBackClick: () -> Unit,
-    onStartCookingClick: () -> Unit,
+    onStartCookingClick: (Int) -> Unit,
     onWriteReviewClick: () -> Unit,
     onProfileClick: () -> Unit,
-    onSignInClick: () -> Unit = {}
+    onSignInClick: () -> Unit = {},
+    onOpenGroceryList: ((String) -> Unit)? = null
 ) {
+    val context = LocalContext.current
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
     val recipes by viewModel.recipes.collectAsState()
-    val recipe = recipes.find { it.id == recipeId } ?: recipes.firstOrNull() ?: return
+    val recipe = recipes.find { it.id == recipeId }
+    if (recipe == null) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White)
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Recipe not found", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkText)
+            Spacer(modifier = Modifier.height(12.dp))
+            PrimaryYellowButton(text = "Go Back", onClick = onBackClick, showArrow = false)
+        }
+        return
+    }
+
+    LaunchedEffect(recipe.id) {
+        viewModel.initRecipeDetail(recipe.id, recipe.defaultServings)
+    }
+
     val servings by viewModel.servingsCount.collectAsState()
+    val checkedIngredientsMap by viewModel.detailCheckedIngredients.collectAsState()
+    val checkedIds = checkedIngredientsMap[recipe.id].orEmpty()
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val tabTitles = listOf("Ingredients", "Steps", "Reviews")
-    var exportSuccessMessage by remember { mutableStateOf(false) }
+    var exportResult by remember { mutableStateOf<ExportGroceryResult?>(null) }
     var showAuthDialog by remember { mutableStateOf(false) }
     var authDialogReason by remember { mutableStateOf("") }
     val isMetricUnit by viewModel.isMetricUnit.collectAsState()
+
+    exportResult?.let { result ->
+        ExportGroceryResultDialog(
+            result = result,
+            onDismiss = { exportResult = null },
+            onOpenList = onOpenGroceryList
+        )
+    }
 
     if (showAuthDialog) {
         AlertDialog(
             onDismissRequest = { showAuthDialog = false },
             title = {
-                Text("Fitur Khusus Pengguna Terdaftar", fontWeight = FontWeight.Bold, color = DarkText)
+                Text("Member Feature", fontWeight = FontWeight.Bold, color = DarkText)
             },
             text = {
                 Text(authDialogReason, fontSize = 13.sp, color = DarkTextSecondary)
@@ -119,12 +172,12 @@ fun RecipeDetailScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryYellow, contentColor = DarkText)
                 ) {
-                    Text("Masuk / Daftar", fontWeight = FontWeight.Bold)
+                    Text("Sign In / Register", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showAuthDialog = false }) {
-                    Text("Nanti Saja", color = DarkText)
+                    Text("Later", color = DarkText)
                 }
             }
         )
@@ -152,23 +205,49 @@ fun RecipeDetailScreen(
                 color = DarkText
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { }) {
+                IconButton(onClick = {
+                    val shareBody = buildString {
+                        appendLine("${recipe.title} (${recipe.durationMinutes} min | ${recipe.difficulty})")
+                        appendLine("By ${recipe.chefName}")
+                        appendLine()
+                        appendLine("Ingredients ($servings servings):")
+                        recipe.ingredients.forEach { ing ->
+                            val qty = ing.formattedAmount(
+                                servings.toDouble() / recipe.defaultServings.coerceAtLeast(1).toDouble(),
+                                isMetric = isMetricUnit
+                            )
+                            appendLine("- $qty ${ing.name}")
+                        }
+                    }
+                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_SUBJECT, recipe.title)
+                        putExtra(Intent.EXTRA_TEXT, shareBody)
+                    }
+                    context.startActivity(Intent.createChooser(shareIntent, "Share Recipe"))
+                }) {
                     Icon(Icons.Filled.Share, contentDescription = "Share", tint = DarkText)
                 }
                 Box(
                     modifier = Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF7D5800))
+                        .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                         .clickable(onClick = onProfileClick),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Person,
-                        contentDescription = "Profile",
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF7D5800)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Person,
+                            contentDescription = "Profile",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
         }
@@ -179,26 +258,49 @@ fun RecipeDetailScreen(
                 .padding(horizontal = 16.dp)
         ) {
             item {
-                Box(
+                val totalCookingMins = recipe.steps.sumOf { it.durationMinutes }.coerceAtLeast(recipe.durationMinutes)
+                RecipeImageBox(
+                    imageUri = recipe.imageUri,
+                    fallbackColor = Color(0xFF1E293B),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp)
+                        .height(180.dp)
                         .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0xFF1E293B)),
-                    contentAlignment = Alignment.Center
+                        .clickable {
+                            onStartCookingClick(recipe.steps.firstOrNull()?.durationMinutes ?: 5)
+                        }
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(52.dp)
-                            .clip(CircleShape)
-                            .background(PrimaryYellow),
-                        contentAlignment = Alignment.Center
+                    if (recipe.imageUri.isNotBlank()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.35f))
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.PlayArrow,
-                            contentDescription = "Play Video",
-                            tint = DarkText,
-                            modifier = Modifier.size(32.dp)
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(PrimaryYellow),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.PlayArrow,
+                                contentDescription = "Start Interactive Cooking",
+                                tint = DarkText,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Start Guided Cooking",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
 
@@ -211,7 +313,7 @@ fun RecipeDetailScreen(
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
-                            text = "04:15",
+                            text = "$totalCookingMins min guide",
                             color = Color.White,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold
@@ -245,7 +347,7 @@ fun RecipeDetailScreen(
                             Text(
                                 text = "${recipe.difficulty} | ${recipe.durationMinutes}m",
                                 fontSize = 13.sp,
-                                color = Color(0xFFB45309),
+                                color = AmberBadgeText,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
@@ -255,7 +357,7 @@ fun RecipeDetailScreen(
                         if (isLoggedIn) {
                             viewModel.toggleBookmark(recipe.id)
                         } else {
-                            authDialogReason = "Menyimpan (bookmark) resep hanya dapat dilakukan oleh pengguna terdaftar."
+                            authDialogReason = "Please sign in or register to bookmark recipes."
                             showAuthDialog = true
                         }
                     }) {
@@ -271,13 +373,13 @@ fun RecipeDetailScreen(
             }
 
             item {
-                TabRow(
+                PrimaryTabRow(
                     selectedTabIndex = selectedTabIndex,
                     containerColor = Color.White,
                     contentColor = DarkText,
-                    indicator = { tabPositions ->
-                        TabRowDefaults.SecondaryIndicator(
-                            modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
+                    indicator = {
+                        TabRowDefaults.PrimaryIndicator(
+                            modifier = Modifier.tabIndicatorOffset(selectedTabIndex, matchContentSize = true),
                             color = PrimaryYellow
                         )
                     }
@@ -328,173 +430,231 @@ fun RecipeDetailScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
-                                    .size(30.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White)
+                                    .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                                     .clickable { viewModel.decrementServings() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Filled.Remove, contentDescription = "Decrease", tint = DarkText, modifier = Modifier.size(16.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Filled.Remove, contentDescription = "Decrease servings", tint = DarkText, modifier = Modifier.size(16.dp))
+                                }
                             }
-                            Spacer(modifier = Modifier.width(12.dp))
                             Text(
                                 text = servings.toString(),
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = DarkText
+                                color = DarkText,
+                                modifier = Modifier.padding(horizontal = 6.dp)
                             )
-                            Spacer(modifier = Modifier.width(12.dp))
                             Box(
                                 modifier = Modifier
-                                    .size(30.dp)
-                                    .clip(CircleShape)
-                                    .background(PrimaryYellow)
+                                    .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                                     .clickable { viewModel.incrementServings() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Filled.Add, contentDescription = "Increase", tint = DarkText, modifier = Modifier.size(16.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(PrimaryYellow),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Filled.Add, contentDescription = "Increase servings", tint = DarkText, modifier = Modifier.size(16.dp))
+                                }
                             }
                         }
                     }
                     Spacer(modifier = Modifier.height(14.dp))
                 }
 
-                items(recipe.ingredients) { ingredient ->
-                    var isChecked by remember { mutableStateOf(false) }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(LightGrayBg)
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Checkbox(
-                                checked = isChecked,
-                                onCheckedChange = { isChecked = it },
-                                colors = CheckboxDefaults.colors(
-                                    checkedColor = PrimaryYellow,
-                                    checkmarkColor = DarkText
-                                )
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Column {
-                                Text(
-                                    text = ingredient.name,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = DarkText
-                                )
-                                if (ingredient.subtitle.isNotBlank()) {
-                                    Text(
-                                        text = ingredient.subtitle,
-                                        fontSize = 11.sp,
-                                        color = DarkTextSecondary
-                                    )
-                                }
-                            }
-                        }
-
+                if (recipe.ingredients.isEmpty()) {
+                    item {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color.White)
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(LightGrayBg)
+                                .padding(20.dp),
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = ingredient.formattedAmount(servings.toDouble() / recipe.defaultServings.toDouble(), isMetric = isMetricUnit),
+                                text = "No ingredients listed for this recipe.",
                                 fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = DarkText
+                                color = DarkTextSecondary
                             )
+                        }
+                    }
+                } else {
+                    items(recipe.ingredients, key = { it.id }) { ingredient ->
+                        val isChecked = checkedIds.contains(ingredient.id)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(LightGrayBg)
+                                .clickable { viewModel.toggleDetailIngredientChecked(recipe.id, ingredient.id) }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Checkbox(
+                                    checked = isChecked,
+                                    onCheckedChange = { viewModel.toggleDetailIngredientChecked(recipe.id, ingredient.id) },
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = PrimaryYellow,
+                                        checkmarkColor = DarkText
+                                    )
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Column {
+                                    Text(
+                                        text = ingredient.name,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = DarkText
+                                    )
+                                    if (ingredient.subtitle.isNotBlank() || ingredient.scalingMode != ScalingMode.PROPORTIONAL) {
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            if (ingredient.subtitle.isNotBlank()) {
+                                                Text(
+                                                    text = ingredient.subtitle,
+                                                    fontSize = 11.sp,
+                                                    color = DarkTextSecondary
+                                                )
+                                            }
+                                            if (ingredient.scalingMode != ScalingMode.PROPORTIONAL) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(AmberBadgeBg)
+                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = ingredient.scalingMode.shortLabel,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = AmberBadgeText
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color.White)
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = ingredient.formattedAmount(
+                                        servings.toDouble() / recipe.defaultServings.coerceAtLeast(1).toDouble(),
+                                        isMetric = isMetricUnit
+                                    ),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = DarkText
+                                )
+                            }
                         }
                     }
                 }
 
                 item {
                     Spacer(modifier = Modifier.height(16.dp))
-                    AnimatedVisibility(visible = exportSuccessMessage) {
+                }
+            } else if (selectedTabIndex == 1) {
+                if (recipe.steps.isEmpty()) {
+                    item {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0xFFDCFCE7))
-                                .padding(12.dp),
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(LightGrayBg)
+                                .padding(20.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Exported to Grocery Checklist successfully!",
-                                color = Color(0xFF15803D),
+                                text = "No preparation steps listed for this recipe.",
                                 fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
+                                color = DarkTextSecondary
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-            } else if (selectedTabIndex == 1) {
-                items(recipe.steps) { step ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(LightGrayBg)
-                            .border(1.dp, BorderGray, RoundedCornerShape(16.dp))
-                            .padding(14.dp)
-                    ) {
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(26.dp)
-                                            .clip(CircleShape)
-                                            .background(PrimaryYellow),
-                                        contentAlignment = Alignment.Center
-                                    ) {
+                } else {
+                    items(recipe.steps, key = { it.stepNumber }) { step ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(LightGrayBg)
+                                .border(1.dp, BorderGray, RoundedCornerShape(16.dp))
+                                .padding(14.dp)
+                        ) {
+                            Column {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(26.dp)
+                                                .clip(CircleShape)
+                                                .background(PrimaryYellow),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = step.stepNumber.toString(),
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = DarkText
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(10.dp))
                                         Text(
-                                            text = step.stepNumber.toString(),
-                                            fontSize = 13.sp,
+                                            text = step.title,
+                                            fontSize = 15.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = DarkText
                                         )
                                     }
-                                    Spacer(modifier = Modifier.width(10.dp))
+
                                     Text(
-                                        text = step.title,
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = DarkText
+                                        text = "${step.durationMinutes} min",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = DarkTextSecondary
                                     )
                                 }
 
+                                Spacer(modifier = Modifier.height(8.dp))
+
                                 Text(
-                                    text = "${step.durationMinutes} min",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = DarkTextSecondary
+                                    text = step.description,
+                                    fontSize = 13.sp,
+                                    color = DarkTextSecondary,
+                                    lineHeight = 18.sp
                                 )
                             }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Text(
-                                text = step.description,
-                                fontSize = 13.sp,
-                                color = DarkTextSecondary,
-                                lineHeight = 18.sp
-                            )
                         }
                     }
                 }
@@ -524,7 +684,7 @@ fun RecipeDetailScreen(
                                 if (isLoggedIn) {
                                     onWriteReviewClick()
                                 } else {
-                                    authDialogReason = "Memberi rating dan ulasan resep hanya dapat dilakukan oleh pengguna terdaftar."
+                                    authDialogReason = "Please sign in or register to rate and review recipes."
                                     showAuthDialog = true
                                 }
                             },
@@ -598,66 +758,87 @@ fun RecipeDetailScreen(
                             }
                         }
                     }
+
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
-                items(recipe.reviews) { review ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(LightGrayBg)
-                            .padding(14.dp)
-                    ) {
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(0xFFE2E8F0)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
+                if (recipe.reviews.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(LightGrayBg)
+                                .padding(20.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No reviews yet. Be the first to review this recipe!",
+                                fontSize = 13.sp,
+                                color = DarkTextSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                } else {
+                    items(recipe.reviews, key = { it.id }) { review ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(LightGrayBg)
+                                .padding(14.dp)
+                        ) {
+                            Column {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(0xFFE2E8F0)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = review.userName.take(2).uppercase(),
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = DarkText
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = review.userName.take(2).uppercase(),
-                                            fontSize = 12.sp,
+                                            text = review.userName,
+                                            fontSize = 14.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = DarkText
                                         )
                                     }
-                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = review.userName,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = DarkText
+                                        text = review.timeAgo,
+                                        fontSize = 11.sp,
+                                        color = DarkTextSecondary
                                     )
                                 }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row {
+                                    repeat(review.rating) {
+                                        Icon(Icons.Filled.Star, contentDescription = null, tint = StarYellow, modifier = Modifier.size(12.dp))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
                                 Text(
-                                    text = review.timeAgo,
-                                    fontSize = 11.sp,
-                                    color = DarkTextSecondary
+                                    text = review.comment,
+                                    fontSize = 13.sp,
+                                    color = DarkText,
+                                    lineHeight = 18.sp
                                 )
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row {
-                                repeat(review.rating) {
-                                    Icon(Icons.Filled.Star, contentDescription = null, tint = StarYellow, modifier = Modifier.size(12.dp))
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = review.comment,
-                                fontSize = 13.sp,
-                                color = DarkText,
-                                lineHeight = 18.sp
-                            )
                         }
                     }
                 }
@@ -666,40 +847,45 @@ fun RecipeDetailScreen(
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = Color.White,
-            shadowElevation = 8.dp
+            color = Color.White
         ) {
-            Box(modifier = Modifier.padding(16.dp)) {
-                if (selectedTabIndex == 0) {
-                    PrimaryYellowButton(
-                        text = "Export to Grocery Checklist",
-                        onClick = {
-                            if (isLoggedIn) {
-                                viewModel.exportRecipeToGrocery(recipe)
-                                exportSuccessMessage = true
-                            } else {
-                                authDialogReason = "Mengekspor bahan resep ke daftar belanja hanya dapat dilakukan oleh pengguna terdaftar."
-                                showAuthDialog = true
+            Column(modifier = Modifier.fillMaxWidth()) {
+                HorizontalDivider(thickness = 1.dp, color = BorderGray)
+                Box(modifier = Modifier.padding(16.dp)) {
+                    if (selectedTabIndex == 0) {
+                        PrimaryYellowButton(
+                            text = "Export to Grocery Checklist",
+                            onClick = {
+                                if (isLoggedIn) {
+                                    viewModel.exportRecipeToGrocery(recipe, servings) { result ->
+                                        exportResult = result
+                                    }
+                                } else {
+                                    authDialogReason = "Please sign in or register to export ingredients to a grocery checklist."
+                                    showAuthDialog = true
+                                }
                             }
-                        }
-                    )
-                } else if (selectedTabIndex == 1) {
-                    PrimaryYellowButton(
-                        text = "Start Cooking Mode",
-                        onClick = onStartCookingClick
-                    )
-                } else {
-                    PrimaryYellowButton(
-                        text = "Write a Review",
-                        onClick = {
-                            if (isLoggedIn) {
-                                onWriteReviewClick()
-                            } else {
-                                authDialogReason = "Memberi rating dan ulasan resep hanya dapat dilakukan oleh pengguna terdaftar."
-                                showAuthDialog = true
+                        )
+                    } else if (selectedTabIndex == 1) {
+                        PrimaryYellowButton(
+                            text = "Start Cooking Mode",
+                            onClick = {
+                                onStartCookingClick(recipe.steps.firstOrNull()?.durationMinutes ?: 5)
                             }
-                        }
-                    )
+                        )
+                    } else {
+                        PrimaryYellowButton(
+                            text = "Write a Review",
+                            onClick = {
+                                if (isLoggedIn) {
+                                    onWriteReviewClick()
+                                } else {
+                                    authDialogReason = "Please sign in or register to write a review."
+                                    showAuthDialog = true
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -725,21 +911,81 @@ fun CookingModeScreen(
     }
 
     val recipes by viewModel.recipes.collectAsState()
-    val recipe = recipes.find { it.id == recipeId } ?: recipes.firstOrNull() ?: return
+    val recipe = recipes.find { it.id == recipeId } ?: recipes.firstOrNull()
+    val steps = recipe?.steps.orEmpty()
+
+    if (recipe == null || steps.isEmpty()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White)
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("No cooking steps available for this recipe.", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkText, textAlign = TextAlign.Center)
+            Spacer(modifier = Modifier.height(16.dp))
+            PrimaryYellowButton(text = "Back to Recipe", onClick = onBackClick, showArrow = false)
+        }
+        return
+    }
+
+    LaunchedEffect(recipe.id) {
+        viewModel.initCookingMode(recipe.id, steps.first().durationMinutes)
+    }
+
     val currentStepIndex by viewModel.currentCookingStep.collectAsState()
-    val steps = recipe.steps
-    val currentStep = steps.getOrNull(currentStepIndex - 1) ?: steps.lastOrNull() ?: return
+    val safeStepIndex = currentStepIndex.coerceIn(1, steps.size)
+    val currentStep = steps[safeStepIndex - 1]
 
     val timerSecondsLeft by viewModel.timerSecondsLeft.collectAsState()
     val isTimerRunning by viewModel.isTimerRunning.collectAsState()
     val isTimerDone by viewModel.isTimerDone.collectAsState()
+    val autoAdvanceSecondsLeft by viewModel.autoAdvanceSecondsLeft.collectAsState()
+    val alarmSoundId by viewModel.alarmSoundId.collectAsState()
+    val customAlarmName by viewModel.customAlarmName.collectAsState()
+    val isPreviewingAlarm by viewModel.isPreviewingAlarm.collectAsState()
+    var showAlarmPicker by remember { mutableStateOf(false) }
 
-    LaunchedEffect(currentStep.stepNumber) {
-        viewModel.resetTimer(currentStep.durationMinutes)
+    val activeAlarmPreset = AlarmSoundPreset.fromId(alarmSoundId)
+    val activeAlarmLabel = if (activeAlarmPreset == AlarmSoundPreset.CUSTOM && customAlarmName.isNotBlank()) {
+        customAlarmName
+    } else {
+        activeAlarmPreset.label
     }
 
-    val progress = viewModel.calculateProgress(currentStepIndex, steps.size)
+    if (showAlarmPicker) {
+        AlarmSoundPickerDialog(
+            selectedSoundId = alarmSoundId,
+            customAudioName = customAlarmName,
+            isPreviewing = isPreviewingAlarm,
+            onSelectPreset = { viewModel.selectAlarmPreset(it) },
+            onPickCustomAudio = { uri, cb -> viewModel.saveCustomAlarmFromUri(uri, cb) },
+            onTogglePreview = { viewModel.previewAlarmSound() },
+            onStopPreview = { viewModel.stopAlarm() },
+            onDismiss = { showAlarmPicker = false }
+        )
+    }
 
+    val latestStepIndex by rememberUpdatedState(safeStepIndex)
+    val latestSteps by rememberUpdatedState(steps)
+    val latestOnFinish by rememberUpdatedState(onFinishCookingClick)
+
+    LaunchedEffect(Unit) {
+        viewModel.autoAdvanceEvent.collect {
+            val cur = latestStepIndex
+            val list = latestSteps
+            if (cur < list.size) {
+                val next = cur + 1
+                val nextDur = list.getOrNull(next - 1)?.durationMinutes ?: 5
+                viewModel.setCookingStep(next, nextDur)
+            } else {
+                latestOnFinish()
+            }
+        }
+    }
+
+    val progress = viewModel.calculateProgress(safeStepIndex, steps.size)
     val timerMinutes = timerSecondsLeft / 60
     val timerSeconds = timerSecondsLeft % 60
     val formattedTime = String.format(java.util.Locale.US, "%02d:%02d", timerMinutes, timerSeconds)
@@ -748,10 +994,13 @@ fun CookingModeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.SpaceBetween
+            .padding(16.dp)
     ) {
-        Column {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -768,8 +1017,15 @@ fun CookingModeScreen(
                     fontWeight = FontWeight.Bold,
                     color = DarkText
                 )
-                IconButton(onClick = { }) {
-                    Icon(Icons.Filled.Share, contentDescription = "Share", tint = DarkText)
+                IconButton(onClick = {
+                    val shareStep = "${recipe.title} - Step $safeStepIndex: ${currentStep.title}\n${currentStep.description}"
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, shareStep)
+                    }
+                    context.startActivity(Intent.createChooser(intent, "Share Cooking Step"))
+                }) {
+                    Icon(Icons.Filled.Share, contentDescription = "Share Step", tint = DarkText)
                 }
             }
 
@@ -785,135 +1041,166 @@ fun CookingModeScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(PrimaryYellow),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = currentStep.stepNumber.toString(),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = recipe.title,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = DarkText
+            AnimatedContent(
+                targetState = safeStepIndex,
+                transitionSpec = {
+                    val isForward = targetState >= initialState
+                    val slideSpec = tween<androidx.compose.ui.unit.IntOffset>(
+                        durationMillis = 220,
+                        easing = FastOutSlowInEasing
                     )
-                }
-
-                if (currentStep.isFinalStep) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFFFFE0B2))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "Final Step",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFE65100)
-                        )
+                    if (isForward) {
+                        slideInHorizontally(animationSpec = slideSpec) { it } togetherWith
+                            slideOutHorizontally(animationSpec = slideSpec) { -(it * 0.25f).toInt() }
+                    } else {
+                        slideInHorizontally(animationSpec = slideSpec) { -(it * 0.25f).toInt() } togetherWith
+                            slideOutHorizontally(animationSpec = slideSpec) { it }
                     }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFF334155))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .padding(10.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color.Black.copy(alpha = 0.6f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = if (isTimerDone) "Step Complete!" else "Keep Screen Awake Active",
-                        fontSize = 11.sp,
-                        color = PrimaryYellow,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
+                },
+                label = "cooking_step_transition"
+            ) { animatedStepIndex ->
+                val animatedStep = steps[(animatedStepIndex - 1).coerceIn(0, steps.lastIndex)]
                 Column(
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(12.dp)
-                ) {
-                    Text(
-                        text = "METHOD",
-                        fontSize = 10.sp,
-                        color = Color.LightGray,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = currentStep.title,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(LightGrayBg)
-                    .padding(16.dp)
-            ) {
-                Text(
-                    text = currentStep.description,
-                    fontSize = 14.sp,
-                    color = DarkText,
-                    lineHeight = 22.sp
-                )
-            }
-
-            if (currentStep.tip.isNotBlank()) {
-                Spacer(modifier = Modifier.height(14.dp))
-                Box(
-                    modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFFFFF3E0))
-                        .padding(14.dp)
+                        .background(Color.White)
                 ) {
-                    Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(PrimaryYellow),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = animatedStep.stepNumber.toString(),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = DarkText
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = recipe.title,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = DarkText
+                            )
+                        }
+
+                        if (animatedStep.isFinalStep || animatedStepIndex == steps.size) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(AmberBadgeBg)
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "Final Step",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AmberBadgeText
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0xFF334155))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .padding(10.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color.Black.copy(alpha = 0.7f))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            val statusLabel = when {
+                                autoAdvanceSecondsLeft != null -> "Time's up! Moving on in ${autoAdvanceSecondsLeft}s"
+                                isTimerDone -> "Step Complete!"
+                                else -> "Keep Screen Awake Active"
+                            }
+                            Text(
+                                text = statusLabel,
+                                fontSize = 11.sp,
+                                color = Color(0xFFFDE047),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                text = "METHOD",
+                                fontSize = 10.sp,
+                                color = Color.LightGray,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = animatedStep.title,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(LightGrayBg)
+                            .padding(16.dp)
+                    ) {
                         Text(
-                            text = "Chef's Pro Tip",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFE65100)
+                            text = animatedStep.description,
+                            fontSize = 14.sp,
+                            color = DarkText,
+                            lineHeight = 22.sp
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = currentStep.tip,
-                            fontSize = 12.sp,
-                            color = Color(0xFFBF360C)
-                        )
+                    }
+
+                    if (animatedStep.tip.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(TipBannerBg)
+                                .padding(14.dp)
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Chef's Pro Tip",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AmberBadgeText
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = animatedStep.tip,
+                                    fontSize = 12.sp,
+                                    color = TipBannerText
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -924,14 +1211,17 @@ fun CookingModeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (isTimerDone) Color(0xFFE8F5E9) else LightGrayBg)
+                    .background(if (isTimerDone) GreenSuccessBg else LightGrayBg)
                     .padding(horizontal = 14.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { viewModel.startStepTimer(currentStep.durationMinutes) }
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { viewModel.startStepTimer(currentStep.durationMinutes) }
+                        .padding(vertical = 4.dp)
                 ) {
                     Icon(
                         imageVector = when {
@@ -940,8 +1230,8 @@ fun CookingModeScreen(
                             else -> Icons.Filled.PlayArrow
                         },
                         contentDescription = "Timer Toggle",
-                        tint = if (isTimerDone) Color(0xFF2E7D32) else PrimaryYellow,
-                        modifier = Modifier.size(22.dp)
+                        tint = if (isTimerDone) GreenSuccessText else PrimaryYellow,
+                        modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
@@ -949,30 +1239,93 @@ fun CookingModeScreen(
                             text = if (isTimerDone) "Done!" else formattedTime,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isTimerDone) Color(0xFF2E7D32) else DarkText
+                            color = if (isTimerDone) GreenSuccessText else DarkText
                         )
+                        val timerSub = when {
+                            autoAdvanceSecondsLeft != null -> {
+                                val nextLabel = if (safeStepIndex < steps.size) "next step" else "summary"
+                                "Next: $nextLabel in ${autoAdvanceSecondsLeft}s (tap +1 min to add time)"
+                            }
+                            isTimerDone -> "Cooking stage finished"
+                            isTimerRunning -> "Timer running (tap to pause)"
+                            else -> "Tap to start countdown"
+                        }
                         Text(
-                            text = when {
-                                isTimerDone -> "Cooking stage finished"
-                                isTimerRunning -> "Timer running (tap to pause)"
-                                else -> "Tap to start countdown"
-                            },
+                            text = timerSub,
                             fontSize = 11.sp,
-                            color = DarkTextSecondary
+                            color = if (autoAdvanceSecondsLeft != null) GreenSuccessText else DarkTextSecondary,
+                            fontWeight = if (autoAdvanceSecondsLeft != null) FontWeight.SemiBold else FontWeight.Normal
                         )
                     }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White)
-                        .clickable { viewModel.addExtraMinute() }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text("+1 min", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (autoAdvanceSecondsLeft != null) PrimaryYellow else Color.White)
+                            .clickable { viewModel.addExtraMinute() }
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                    ) {
+                        Text(
+                            text = "+1 min",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = DarkText
+                        )
+                    }
+                    if (autoAdvanceSecondsLeft != null) {
+                        Text(
+                            text = "Stay here",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = DarkTextSecondary,
+                            modifier = Modifier
+                                .clickable { viewModel.cancelAutoAdvanceGrace() }
+                                .padding(horizontal = 6.dp, vertical = 4.dp)
+                        )
+                    }
                 }
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(LightGrayBg)
+                    .clickable { showAlarmPicker = true }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Icon(
+                        imageVector = Icons.Filled.NotificationsActive,
+                        contentDescription = null,
+                        tint = DarkText,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Alarm: $activeAlarmLabel",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = DarkText
+                    )
+                }
+                Text(
+                    text = "Change",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AmberBadgeText
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
         Column {
@@ -981,7 +1334,7 @@ fun CookingModeScreen(
                 onClick = onFinishCookingClick
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -991,17 +1344,19 @@ fun CookingModeScreen(
                 Text(
                     text = "< Previous Step",
                     fontSize = 13.sp,
-                    color = if (currentStepIndex > 1) DarkText else Color.LightGray,
+                    color = if (safeStepIndex > 1) DarkText else DarkTextSecondary.copy(alpha = 0.45f),
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.clickable(enabled = currentStepIndex > 1) {
-                        val prev = currentStepIndex - 1
-                        val prevDuration = steps.getOrNull(prev - 1)?.durationMinutes ?: 5
-                        viewModel.setCookingStep(prev, prevDuration)
-                    }
+                    modifier = Modifier
+                        .clickable(enabled = safeStepIndex > 1) {
+                            val prev = safeStepIndex - 1
+                            val prevDuration = steps.getOrNull(prev - 1)?.durationMinutes ?: 5
+                            viewModel.setCookingStep(prev, prevDuration)
+                        }
+                        .padding(horizontal = 8.dp, vertical = 12.dp)
                 )
 
                 Text(
-                    text = "Step $currentStepIndex of ${steps.size}",
+                    text = "Step $safeStepIndex of ${steps.size}",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = DarkTextSecondary
@@ -1010,13 +1365,15 @@ fun CookingModeScreen(
                 Text(
                     text = "Next >",
                     fontSize = 13.sp,
-                    color = if (currentStepIndex < steps.size) DarkText else Color.LightGray,
+                    color = if (safeStepIndex < steps.size) DarkText else DarkTextSecondary.copy(alpha = 0.45f),
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.clickable(enabled = currentStepIndex < steps.size) {
-                        val next = currentStepIndex + 1
-                        val nextDuration = steps.getOrNull(next - 1)?.durationMinutes ?: 5
-                        viewModel.setCookingStep(next, nextDuration)
-                    }
+                    modifier = Modifier
+                        .clickable(enabled = safeStepIndex < steps.size) {
+                            val next = safeStepIndex + 1
+                            val nextDuration = steps.getOrNull(next - 1)?.durationMinutes ?: 5
+                            viewModel.setCookingStep(next, nextDuration)
+                        }
+                        .padding(horizontal = 8.dp, vertical = 12.dp)
                 )
             }
         }
@@ -1027,42 +1384,45 @@ fun CookingModeScreen(
 fun FinishedCookingScreen(
     recipeId: String,
     viewModel: CookingViewModel,
-    onRateRecipeClick: () -> Unit,
+    onRateRecipeClick: (Int) -> Unit,
     onDoneClick: () -> Unit
 ) {
     val recipes by viewModel.recipes.collectAsState()
     val recipe = recipes.find { it.id == recipeId } ?: recipes.firstOrNull() ?: return
-    var userRating by remember { mutableIntStateOf(4) }
+    var userRating by remember { mutableIntStateOf(5) }
+    val stepsCount = recipe.steps.size.coerceAtLeast(1)
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
+            .padding(24.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onDoneClick) {
-                Icon(Icons.Filled.Close, contentDescription = "Close", tint = DarkText)
-            }
-            Text(
-                text = "Finished Cooking",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = DarkText
-            )
-            Spacer(modifier = Modifier.width(48.dp))
-        }
-
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onDoneClick) {
+                    Icon(Icons.Filled.Close, contentDescription = "Close", tint = DarkText)
+                }
+                Text(
+                    text = "Finished Cooking",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = DarkText
+                )
+                Spacer(modifier = Modifier.width(48.dp))
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Box(
                 modifier = Modifier
                     .size(80.dp)
@@ -1104,11 +1464,12 @@ fun FinishedCookingScreen(
                     .padding(14.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
+                    RecipeImageBox(
+                        imageUri = recipe.imageUri,
+                        fallbackColor = Color(0xFFCBD5E1),
                         modifier = Modifier
                             .size(60.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFFCBD5E1))
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
@@ -1133,7 +1494,7 @@ fun FinishedCookingScreen(
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text("${recipe.durationMinutes}m", fontSize = 11.sp, color = DarkText)
                             Text("${recipe.calories} kcal", fontSize = 11.sp, color = DarkText)
-                            Text("6/6 steps", fontSize = 11.sp, color = DarkText)
+                            Text("$stepsCount/$stepsCount steps", fontSize = 11.sp, color = DarkText)
                         }
                     }
                 }
@@ -1164,34 +1525,41 @@ fun FinishedCookingScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         (1..5).forEach { star ->
-                            Icon(
-                                imageVector = Icons.Filled.Star,
-                                contentDescription = "$star stars",
-                                tint = if (star <= userRating) StarYellow else Color.LightGray,
+                            Box(
                                 modifier = Modifier
-                                    .size(32.dp)
-                                    .clickable { userRating = star }
-                            )
+                                    .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                                    .clickable { userRating = star },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Star,
+                                    contentDescription = "$star stars",
+                                    tint = if (star <= userRating) StarYellow else Color.LightGray,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Great! ($userRating / 5)",
+                        text = "Rating ($userRating / 5)",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = DarkTextSecondary
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
         Column(modifier = Modifier.fillMaxWidth()) {
             PrimaryYellowButton(
                 text = "Rate & Review Recipe",
-                onClick = onRateRecipeClick
+                onClick = { onRateRecipeClick(userRating) }
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -1199,7 +1567,8 @@ fun FinishedCookingScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = onDoneClick),
+                    .clickable(onClick = onDoneClick)
+                    .padding(vertical = 10.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(

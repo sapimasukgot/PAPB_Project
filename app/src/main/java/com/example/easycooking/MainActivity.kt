@@ -2,13 +2,33 @@ package com.example.easycooking
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.IntOffset
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -17,9 +37,9 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import kotlinx.coroutines.launch
 import com.example.easycooking.navigation.BottomTab
 import com.example.easycooking.navigation.Screen
 import com.example.easycooking.ui.components.AppBottomNavigationBar
@@ -70,40 +90,72 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private const val NAV_TRANSITION_DURATION_MS = 260
+private const val TAB_TRANSITION_DURATION_MS = 220
+
 @Composable
 fun EasyCookingApp(
     viewModel: CookingViewModel = viewModel(),
     navController: NavHostController = rememberNavController()
 ) {
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
+    val coroutineScope = rememberCoroutineScope()
     val currentTab by viewModel.currentTab.collectAsState()
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+    val rememberMe by viewModel.rememberMe.collectAsState()
+    val startupAuthChecked by viewModel.startupAuthChecked.collectAsState()
+    var didAutoRoute by remember { mutableStateOf(false) }
 
-    val shouldShowBottomBar = currentRoute == Screen.MainContainer.route
-
-    Scaffold(
-        bottomBar = {
-            if (shouldShowBottomBar) {
-                AppBottomNavigationBar(
-                    currentTab = currentTab,
-                    onTabSelected = { tab ->
-                        viewModel.setBottomTab(tab)
-                    }
-                )
+    LaunchedEffect(startupAuthChecked, isLoggedIn, rememberMe) {
+        if (startupAuthChecked && !didAutoRoute) {
+            didAutoRoute = true
+            if (isLoggedIn && rememberMe &&
+                navController.currentDestination?.route == Screen.Welcome.route
+            ) {
+                navController.navigate(Screen.MainContainer.route) {
+                    popUpTo(Screen.Welcome.route) { inclusive = true }
+                }
             }
         }
+    }
+
+    val slideSpec = tween<IntOffset>(
+        durationMillis = NAV_TRANSITION_DURATION_MS,
+        easing = FastOutSlowInEasing
+    )
+
+    Scaffold(
+        containerColor = Color.White
     ) { innerPadding ->
         NavHost(
             navController = navController,
             startDestination = Screen.Welcome.route,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White)
+                .padding(innerPadding)
+                .imePadding(),
+            enterTransition = {
+                slideInHorizontally(animationSpec = slideSpec) { fullWidth -> fullWidth }
+            },
+            exitTransition = {
+                slideOutHorizontally(animationSpec = slideSpec) { fullWidth -> -(fullWidth * 0.25f).toInt() }
+            },
+            popEnterTransition = {
+                slideInHorizontally(animationSpec = slideSpec) { fullWidth -> -(fullWidth * 0.25f).toInt() }
+            },
+            popExitTransition = {
+                slideOutHorizontally(animationSpec = slideSpec) { fullWidth -> fullWidth }
+            }
         ) {
             composable(Screen.Welcome.route) {
                 WelcomeScreen(
                     onGetStartedClick = { navController.navigate(Screen.Login.route) },
                     onContinueGuestClick = {
-                        navController.navigate(Screen.MainContainer.route) {
-                            popUpTo(Screen.Welcome.route) { inclusive = true }
+                        coroutineScope.launch {
+                            viewModel.continueAsGuest()
+                            navController.navigate(Screen.MainContainer.route) {
+                                popUpTo(Screen.Welcome.route) { inclusive = true }
+                            }
                         }
                     }
                 )
@@ -138,56 +190,94 @@ fun EasyCookingApp(
 
             composable(Screen.ForgotPassword.route) {
                 ForgotPasswordScreen(
+                    viewModel = viewModel,
                     onBackClick = { navController.popBackStack() },
-                    onSendCodeClick = { navController.navigate(Screen.Login.route) },
                     onLoginClick = { navController.navigate(Screen.Login.route) }
                 )
             }
 
             composable(Screen.MainContainer.route) {
-                when (currentTab) {
-                    BottomTab.DISCOVER -> DiscoverScreen(
-                        viewModel = viewModel,
-                        onRecipeClick = { id -> navController.navigate(Screen.RecipeDetail.createRoute(id)) },
-                        onFilterClick = { navController.navigate(Screen.FilterModal.route) },
-                        onSearchClick = { navController.navigate(Screen.SearchResults.route) },
-                        onProfileClick = { viewModel.setBottomTab(BottomTab.ACCOUNT) },
-                        onSignInClick = { navController.navigate(Screen.Login.route) }
-                    )
-                    BottomTab.SAVED -> SavedScreen(
-                        viewModel = viewModel,
-                        onRecipeClick = { id -> navController.navigate(Screen.RecipeDetail.createRoute(id)) },
-                        onAddRecipeClick = {
-                            if (viewModel.isLoggedIn.value) {
-                                navController.navigate(Screen.UploadStep1.route)
-                            } else {
-                                navController.navigate(Screen.Login.route)
+                BackHandler(enabled = currentTab != BottomTab.DISCOVER) {
+                    viewModel.setBottomTab(BottomTab.DISCOVER)
+                }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.White)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .background(Color.White)
+                    ) {
+                        AnimatedContent(
+                            targetState = currentTab,
+                            transitionSpec = {
+                                val isForward = targetState.ordinal >= initialState.ordinal
+                                val tabSlideSpec = tween<IntOffset>(
+                                    durationMillis = TAB_TRANSITION_DURATION_MS,
+                                    easing = FastOutSlowInEasing
+                                )
+                                if (isForward) {
+                                    slideInHorizontally(animationSpec = tabSlideSpec) { it } togetherWith
+                                        slideOutHorizontally(animationSpec = tabSlideSpec) { -(it * 0.25f).toInt() }
+                                } else {
+                                    slideInHorizontally(animationSpec = tabSlideSpec) { -(it * 0.25f).toInt() } togetherWith
+                                        slideOutHorizontally(animationSpec = tabSlideSpec) { it }
+                                }
+                            },
+                            label = "main_tab_transition"
+                        ) { targetTab ->
+                            when (targetTab) {
+                                BottomTab.DISCOVER -> DiscoverScreen(
+                                    viewModel = viewModel,
+                                    onRecipeClick = { id -> navController.navigate(Screen.RecipeDetail.createRoute(id)) },
+                                    onFilterClick = { navController.navigate(Screen.FilterModal.route) },
+                                    onSearchClick = { navController.navigate(Screen.SearchResults.route) },
+                                    onProfileClick = { viewModel.setBottomTab(BottomTab.ACCOUNT) },
+                                    onSignInClick = { navController.navigate(Screen.Login.route) }
+                                )
+                                BottomTab.SAVED -> SavedScreen(
+                                    viewModel = viewModel,
+                                    onRecipeClick = { id -> navController.navigate(Screen.RecipeDetail.createRoute(id)) },
+                                    onAddRecipeClick = {
+                                        if (isLoggedIn) {
+                                            navController.navigate(Screen.UploadStep1.route)
+                                        } else {
+                                            navController.navigate(Screen.Login.route)
+                                        }
+                                    },
+                                    onSearchClick = { navController.navigate(Screen.SearchResults.route) },
+                                    onOpenPlanClick = {
+                                        viewModel.setBottomTab(BottomTab.GROCERY)
+                                    },
+                                    onBrowseClick = { viewModel.setBottomTab(BottomTab.DISCOVER) },
+                                    onSignInClick = { navController.navigate(Screen.Login.route) }
+                                )
+                                BottomTab.GROCERY -> GroceryOverviewScreen(
+                                    viewModel = viewModel,
+                                    onListClick = { listId -> navController.navigate(Screen.GroceryDetail.createRoute(listId)) },
+                                    onDiscoverClick = { viewModel.setBottomTab(BottomTab.DISCOVER) },
+                                    onSignInClick = { navController.navigate(Screen.Login.route) }
+                                )
+                                BottomTab.ACCOUNT -> AccountScreen(
+                                    viewModel = viewModel,
+                                    onSignInClick = { navController.navigate(Screen.Login.route) },
+                                    onDietaryPreferencesClick = { navController.navigate(Screen.DietaryAllergies.route) },
+                                    onNewRecipeClick = { navController.navigate(Screen.UploadStep1.route) },
+                                    onRecipeClick = { id -> navController.navigate(Screen.RecipeDetail.createRoute(id)) }
+                                )
                             }
-                        },
-                        onSearchClick = { navController.navigate(Screen.SearchResults.route) },
-                        onOpenPlanClick = {
-                            val first = viewModel.groceryLists.value.firstOrNull()
-                            if (first != null) {
-                                navController.navigate(Screen.GroceryDetail.createRoute(first.id))
-                            } else {
-                                viewModel.setBottomTab(BottomTab.GROCERY)
-                            }
-                        },
-                        onBrowseClick = { viewModel.setBottomTab(BottomTab.DISCOVER) },
-                        onSignInClick = { navController.navigate(Screen.Login.route) }
-                    )
-                    BottomTab.GROCERY -> GroceryOverviewScreen(
-                        viewModel = viewModel,
-                        onListClick = { listId -> navController.navigate(Screen.GroceryDetail.createRoute(listId)) },
-                        onDiscoverClick = { viewModel.setBottomTab(BottomTab.DISCOVER) },
-                        onSignInClick = { navController.navigate(Screen.Login.route) }
-                    )
-                    BottomTab.ACCOUNT -> AccountScreen(
-                        viewModel = viewModel,
-                        onSignInClick = { navController.navigate(Screen.Login.route) },
-                        onDietaryPreferencesClick = { navController.navigate(Screen.DietaryAllergies.route) },
-                        onNewRecipeClick = { navController.navigate(Screen.UploadStep1.route) },
-                        onRecipeClick = { id -> navController.navigate(Screen.RecipeDetail.createRoute(id)) }
+                        }
+                    }
+
+                    AppBottomNavigationBar(
+                        currentTab = currentTab,
+                        onTabSelected = { tab ->
+                            viewModel.setBottomTab(tab)
+                        }
                     )
                 }
             }
@@ -207,8 +297,11 @@ fun EasyCookingApp(
                     viewModel = viewModel,
                     onCloseClick = { navController.popBackStack() },
                     onApplyClick = {
+                        val cameFromSearch = navController.previousBackStackEntry?.destination?.route == Screen.SearchResults.route
                         navController.popBackStack()
-                        navController.navigate(Screen.SearchResults.route)
+                        if (!cameFromSearch) {
+                            navController.navigate(Screen.SearchResults.route)
+                        }
                     }
                 )
             }
@@ -222,13 +315,19 @@ fun EasyCookingApp(
                     recipeId = recipeId,
                     viewModel = viewModel,
                     onBackClick = { navController.popBackStack() },
-                    onStartCookingClick = { navController.navigate(Screen.CookingMode.createRoute(recipeId)) },
+                    onStartCookingClick = { firstStepDuration ->
+                        viewModel.initCookingMode(recipeId, firstStepDuration, forceReset = true)
+                        navController.navigate(Screen.CookingMode.createRoute(recipeId))
+                    },
                     onWriteReviewClick = { navController.navigate(Screen.WriteReview.createRoute(recipeId)) },
                     onProfileClick = {
                         viewModel.setBottomTab(BottomTab.ACCOUNT)
                         navController.popBackStack(Screen.MainContainer.route, false)
                     },
-                    onSignInClick = { navController.navigate(Screen.Login.route) }
+                    onSignInClick = { navController.navigate(Screen.Login.route) },
+                    onOpenGroceryList = { listId ->
+                        navController.navigate(Screen.GroceryDetail.createRoute(listId))
+                    }
                 )
             }
 
@@ -241,7 +340,11 @@ fun EasyCookingApp(
                     recipeId = recipeId,
                     viewModel = viewModel,
                     onBackClick = { navController.popBackStack() },
-                    onFinishCookingClick = { navController.navigate(Screen.FinishedCooking.createRoute(recipeId)) }
+                    onFinishCookingClick = {
+                        navController.navigate(Screen.FinishedCooking.createRoute(recipeId)) {
+                            popUpTo(Screen.CookingMode.route) { inclusive = true }
+                        }
+                    }
                 )
             }
 
@@ -253,7 +356,9 @@ fun EasyCookingApp(
                 FinishedCookingScreen(
                     recipeId = recipeId,
                     viewModel = viewModel,
-                    onRateRecipeClick = { navController.navigate(Screen.WriteReview.createRoute(recipeId)) },
+                    onRateRecipeClick = { selectedRating ->
+                        navController.navigate(Screen.WriteReview.createRoute(recipeId, selectedRating))
+                    },
                     onDoneClick = {
                         navController.popBackStack(Screen.MainContainer.route, false)
                     }
@@ -262,16 +367,27 @@ fun EasyCookingApp(
 
             composable(
                 route = Screen.WriteReview.route,
-                arguments = listOf(navArgument("recipeId") { type = NavType.StringType })
+                arguments = listOf(
+                    navArgument("recipeId") { type = NavType.StringType },
+                    navArgument("initialRating") {
+                        type = NavType.IntType
+                        defaultValue = 5
+                    }
+                )
             ) { backStackEntry ->
                 val recipeId = backStackEntry.arguments?.getString("recipeId") ?: "1"
-                if (!viewModel.isLoggedIn.value) {
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(Screen.WriteReview.route) { inclusive = true }
+                val initialRating = backStackEntry.arguments?.getInt("initialRating") ?: 5
+                LaunchedEffect(isLoggedIn) {
+                    if (!isLoggedIn) {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(Screen.WriteReview.route) { inclusive = true }
+                        }
                     }
-                } else {
+                }
+                if (isLoggedIn) {
                     WriteReviewScreen(
                         recipeId = recipeId,
+                        initialRating = initialRating,
                         viewModel = viewModel,
                         onBackClick = { navController.popBackStack() },
                         onSubmitSuccess = { navController.popBackStack() }
@@ -296,11 +412,14 @@ fun EasyCookingApp(
             }
 
             composable(Screen.UploadStep1.route) {
-                if (!viewModel.isLoggedIn.value) {
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(Screen.UploadStep1.route) { inclusive = true }
+                LaunchedEffect(isLoggedIn) {
+                    if (!isLoggedIn) {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(Screen.UploadStep1.route) { inclusive = true }
+                        }
                     }
-                } else {
+                }
+                if (isLoggedIn) {
                     UploadStep1Screen(
                         viewModel = viewModel,
                         onCancelClick = { navController.popBackStack() },

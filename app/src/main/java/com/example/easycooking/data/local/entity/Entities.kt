@@ -17,7 +17,13 @@ data class RecipeEntity(
     val category: String,
     val dietaryBadgesRaw: String,
     val allergensRaw: String,
-    val defaultServings: Int = 2
+    val defaultServings: Int = 2,
+    val ownerEmail: String = "",
+    val isDraft: Boolean = false,
+    val ingredientsJson: String = "",
+    val stepsJson: String = "",
+    val reviewsJson: String = "",
+    val imageUri: String = ""
 )
 
 @Entity(tableName = "grocery_lists")
@@ -25,7 +31,8 @@ data class GroceryListEntity(
     @PrimaryKey val id: String,
     val title: String,
     val updatedAt: String,
-    val isCompleted: Boolean = false
+    val isCompleted: Boolean = false,
+    val ownerEmail: String = ""
 )
 
 @Entity(tableName = "grocery_items")

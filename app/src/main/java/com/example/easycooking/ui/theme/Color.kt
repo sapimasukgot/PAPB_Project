@@ -24,10 +24,10 @@ val GreenSuccessBg = Color(0xFFE8F5E9)
 val GreenSuccessText = SuccessStatus
 
 val AmberBadgeBg = Color(0xFFFFE0B2)
-val AmberBadgeText = Color(0xFFE65100)
+val AmberBadgeText = Color(0xFF9A3412)
 
 val TipBannerBg = Color(0xFFFFF3E0)
-val TipBannerText = Color(0xFFBF360C)
+val TipBannerText = Color(0xFF9A3412)
 
 val DarkAvatarBg = Color(0xFFBF360C)
 val PlaceholderImageBg = Color(0xFFCFD8DC)

@@ -1,5 +1,6 @@
 package com.example.easycooking.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,30 +14,33 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Divider
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,19 +51,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.easycooking.R
 import com.example.easycooking.ui.components.PrimaryYellowButton
-import com.example.easycooking.viewmodel.CookingViewModel
-import kotlinx.coroutines.launch
+import com.example.easycooking.ui.theme.AmberBadgeBg
+import com.example.easycooking.ui.theme.AmberBadgeText
 import com.example.easycooking.ui.theme.DarkText
 import com.example.easycooking.ui.theme.DarkTextSecondary
+import com.example.easycooking.ui.theme.GreenSuccessText
 import com.example.easycooking.ui.theme.LightGrayBg
 import com.example.easycooking.ui.theme.PrimaryYellow
+import com.example.easycooking.viewmodel.CookingViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun WelcomeScreen(
@@ -70,6 +79,7 @@ fun WelcomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
@@ -81,16 +91,15 @@ fun WelcomeScreen(
         ) {
             Box(
                 modifier = Modifier
-                    .size(96.dp)
+                    .size(104.dp)
                     .clip(CircleShape)
-                    .background(LightGrayBg),
+                    .background(PrimaryYellow),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Restaurant,
-                    contentDescription = "Logo",
-                    tint = DarkText,
-                    modifier = Modifier.size(48.dp)
+                Image(
+                    painter = painterResource(id = R.drawable.ic_chef_hat),
+                    contentDescription = "EasyCooking Chef Hat Logo",
+                    modifier = Modifier.size(62.dp)
                 )
             }
 
@@ -137,17 +146,31 @@ fun LoginScreen(
     onCreateAccountClick: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val rememberedEmail by viewModel.rememberedEmail.collectAsState()
+    val savedRememberMe by viewModel.rememberMe.collectAsState()
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var rememberMe by remember { mutableStateOf(false) }
+    var didPrefillRemembered by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(rememberedEmail, savedRememberMe) {
+        if (!didPrefillRemembered && (rememberedEmail.isNotBlank() || savedRememberMe)) {
+            didPrefillRemembered = true
+            if (email.isBlank() && rememberedEmail.isNotBlank()) {
+                email = rememberedEmail
+            }
+            rememberMe = savedRememberMe
+        }
+    }
 
     if (errorMessage != null) {
         AlertDialog(
             onDismissRequest = { errorMessage = null },
             title = {
                 Text(
-                    text = "Pemberitahuan",
+                    text = "Sign In Notice",
                     fontWeight = FontWeight.Bold,
                     color = DarkText
                 )
@@ -162,9 +185,12 @@ fun LoginScreen(
             confirmButton = {
                 Button(
                     onClick = { errorMessage = null },
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryYellow)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PrimaryYellow,
+                        contentColor = DarkText
+                    )
                 ) {
-                    Text("Coba Lagi", color = Color.White)
+                    Text("Try Again", fontWeight = FontWeight.Bold, color = DarkText)
                 }
             },
             dismissButton = {
@@ -172,7 +198,7 @@ fun LoginScreen(
                     errorMessage = null
                     onForgotPasswordClick()
                 }) {
-                    Text("Lupa Kata Sandi?", color = DarkText)
+                    Text("Forgot Password?", color = DarkText)
                 }
             }
         )
@@ -182,11 +208,12 @@ fun LoginScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
+            .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
         IconButton(
             onClick = onBackClick,
-            modifier = Modifier.padding(top = 16.dp)
+            modifier = Modifier.padding(top = 8.dp)
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -195,7 +222,7 @@ fun LoginScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Box(
             modifier = Modifier
@@ -225,7 +252,7 @@ fun LoginScreen(
             color = DarkTextSecondary
         )
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         Text(
             text = "Email Address",
@@ -237,6 +264,8 @@ fun LoginScreen(
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
+            singleLine = true,
+            placeholder = { Text("you@example.com", color = DarkTextSecondary) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             leadingIcon = {
@@ -265,6 +294,7 @@ fun LoginScreen(
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
+            singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -291,36 +321,54 @@ fun LoginScreen(
             )
         )
 
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp),
-            contentAlignment = Alignment.CenterEnd
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { rememberMe = !rememberMe }
+            ) {
+                Checkbox(
+                    checked = rememberMe,
+                    onCheckedChange = { rememberMe = it },
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = PrimaryYellow,
+                        checkmarkColor = DarkText
+                    )
+                )
+                Text(
+                    text = "Remember Me",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = DarkText
+                )
+            }
             Text(
                 text = "Forgot Password?",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = DarkTextSecondary,
-                modifier = Modifier.clickable(onClick = onForgotPasswordClick)
+                modifier = Modifier
+                    .clickable(onClick = onForgotPasswordClick)
+                    .padding(vertical = 8.dp, horizontal = 4.dp)
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         PrimaryYellowButton(
             text = "Sign In",
             onClick = {
-                if (!email.contains("@") || password.length < 4) {
-                    errorMessage = "Alamat email atau kata sandi tidak valid (minimal 4 karakter)."
-                } else {
-                    coroutineScope.launch {
-                        val result = viewModel.login(email, password)
-                        if (result.isSuccess) {
-                            onSignInSuccess()
-                        } else {
-                            errorMessage = result.exceptionOrNull()?.message ?: "Gagal masuk"
-                        }
+                coroutineScope.launch {
+                    val result = viewModel.login(email, password, rememberMe)
+                    if (result.isSuccess) {
+                        onSignInSuccess()
+                    } else {
+                        errorMessage = result.exceptionOrNull()?.message ?: "Sign in failed."
                     }
                 }
             }
@@ -329,53 +377,9 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Divider(modifier = Modifier.weight(1f))
-            Text(
-                text = "  or continue with  ",
-                fontSize = 12.sp,
-                color = DarkTextSecondary
-            )
-            Divider(modifier = Modifier.weight(1f))
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            OutlinedButton(
-                onClick = onSignInSuccess,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-            ) {
-                Text("Google", color = DarkText, fontWeight = FontWeight.SemiBold)
-            }
-
-            OutlinedButton(
-                onClick = onSignInSuccess,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Phone, contentDescription = null, tint = DarkText, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Phone", color = DarkText, fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.Center
         ) {
             Text("New here? ", fontSize = 13.sp, color = DarkTextSecondary)
@@ -384,7 +388,9 @@ fun LoginScreen(
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = DarkText,
-                modifier = Modifier.clickable(onClick = onCreateAccountClick)
+                modifier = Modifier
+                    .clickable(onClick = onCreateAccountClick)
+                    .padding(horizontal = 4.dp)
             )
         }
     }
@@ -409,7 +415,7 @@ fun RegisterScreen(
             onDismissRequest = { errorMessage = null },
             title = {
                 Text(
-                    text = "Pendaftaran Gagal",
+                    text = "Registration Failed",
                     fontWeight = FontWeight.Bold,
                     color = DarkText
                 )
@@ -424,9 +430,12 @@ fun RegisterScreen(
             confirmButton = {
                 Button(
                     onClick = { errorMessage = null },
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryYellow)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PrimaryYellow,
+                        contentColor = DarkText
+                    )
                 ) {
-                    Text("OK", color = Color.White)
+                    Text("OK", fontWeight = FontWeight.Bold, color = DarkText)
                 }
             }
         )
@@ -436,11 +445,12 @@ fun RegisterScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
+            .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
         IconButton(
             onClick = onBackClick,
-            modifier = Modifier.padding(top = 16.dp)
+            modifier = Modifier.padding(top = 8.dp)
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -449,7 +459,7 @@ fun RegisterScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Text(
             text = "Create Account",
@@ -458,7 +468,7 @@ fun RegisterScreen(
             color = DarkText
         )
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         Text(
             text = "Full Name",
@@ -470,6 +480,8 @@ fun RegisterScreen(
         OutlinedTextField(
             value = fullName,
             onValueChange = { fullName = it },
+            singleLine = true,
+            placeholder = { Text("Chef Name", color = DarkTextSecondary) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             leadingIcon = {
@@ -498,6 +510,8 @@ fun RegisterScreen(
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
+            singleLine = true,
+            placeholder = { Text("you@example.com", color = DarkTextSecondary) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             leadingIcon = {
@@ -517,7 +531,7 @@ fun RegisterScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "Password",
+            text = "Password (min 6 characters)",
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
             color = DarkText
@@ -526,6 +540,7 @@ fun RegisterScreen(
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
+            singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -552,44 +567,28 @@ fun RegisterScreen(
             )
         )
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         PrimaryYellowButton(
             text = "Create Account",
             onClick = {
-                if (fullName.isBlank()) {
-                    errorMessage = "Nama lengkap wajib diisi."
-                } else if (!email.contains("@")) {
-                    errorMessage = "Format email tidak valid."
-                } else if (password.length < 4) {
-                    errorMessage = "Kata sandi minimal 4 karakter."
-                } else {
-                    coroutineScope.launch {
-                        val result = viewModel.register(fullName, email, password)
-                        if (result.isSuccess) {
-                            onRegisterSuccess()
-                        } else {
-                            errorMessage = result.exceptionOrNull()?.message ?: "Gagal mendaftar"
-                        }
+                coroutineScope.launch {
+                    val result = viewModel.register(fullName, email, password)
+                    if (result.isSuccess) {
+                        onRegisterSuccess()
+                    } else {
+                        errorMessage = result.exceptionOrNull()?.message ?: "Registration failed."
                     }
                 }
             }
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "By continuing, you agree to our Terms of Service and Privacy Policy.",
-            fontSize = 12.sp,
-            textAlign = TextAlign.Center,
-            color = DarkTextSecondary,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(20.dp))
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.Center
         ) {
             Text("Already have an account? ", fontSize = 13.sp, color = DarkTextSecondary)
@@ -598,7 +597,9 @@ fun RegisterScreen(
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = DarkText,
-                modifier = Modifier.clickable(onClick = onSignInClick)
+                modifier = Modifier
+                    .clickable(onClick = onSignInClick)
+                    .padding(horizontal = 4.dp)
             )
         }
     }
@@ -606,26 +607,31 @@ fun RegisterScreen(
 
 @Composable
 fun ForgotPasswordScreen(
+    viewModel: CookingViewModel,
     onBackClick: () -> Unit,
-    onSendCodeClick: () -> Unit,
     onLoginClick: () -> Unit
 ) {
+    val coroutineScope = rememberCoroutineScope()
     var recoveryStep by remember { mutableIntStateOf(0) }
-    var email by remember { mutableStateOf("alex@kitchen.com") }
+    var email by remember { mutableStateOf("") }
+    var generatedOtp by remember { mutableStateOf("") }
     var otpCode by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
+            .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
         IconButton(
             onClick = {
+                errorMessage = null
                 if (recoveryStep > 0) recoveryStep -= 1 else onBackClick()
             },
-            modifier = Modifier.padding(top = 16.dp)
+            modifier = Modifier.padding(top = 8.dp)
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -634,7 +640,7 @@ fun ForgotPasswordScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -648,24 +654,21 @@ fun ForgotPasswordScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = when (recoveryStep) {
-                        3 -> Icons.Filled.Check
-                        else -> Icons.Filled.Lock
-                    },
+                    imageVector = if (recoveryStep == 3) Icons.Filled.Check else Icons.Filled.Lock,
                     contentDescription = null,
-                    tint = if (recoveryStep == 3) Color(0xFF2E7D32) else Color(0xFFE65100),
+                    tint = if (recoveryStep == 3) GreenSuccessText else AmberBadgeText,
                     modifier = Modifier.size(36.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             Text(
                 text = when (recoveryStep) {
                     0 -> "Forgot Password?"
-                    1 -> "Verifikasi Kode OTP"
-                    2 -> "Buat Password Baru"
-                    else -> "Password Telah Diubah!"
+                    1 -> "Verify OTP Code"
+                    2 -> "Create New Password"
+                    else -> "Password Updated!"
                 },
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
@@ -674,10 +677,10 @@ fun ForgotPasswordScreen(
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = when (recoveryStep) {
-                    0 -> "Masukkan email terdaftar untuk menerima kode verifikasi pemulihan (OTP)."
-                    1 -> "Kode OTP 6-digit telah dikirimkan ke $email. Silakan masukkan kode untuk memverifikasi identitas."
-                    2 -> "Kredensial berhasil diverifikasi. Masukkan kata sandi baru untuk akun Anda."
-                    else -> "Kata sandi akun Anda berhasil diperbarui. Silakan login kembali dengan password baru."
+                    0 -> "Enter your registered email address to generate a recovery code."
+                    1 -> "Enter the 6-digit verification code for ${email.trim()}."
+                    2 -> "Verification succeeded. Choose a new password (min 6 characters)."
+                    else -> "Your password has been updated. You can now sign in with your new credentials."
                 },
                 fontSize = 13.sp,
                 color = DarkTextSecondary,
@@ -686,7 +689,25 @@ fun ForgotPasswordScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        if (errorMessage != null) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFFFEE2E2))
+                    .padding(12.dp)
+            ) {
+                Text(
+                    text = errorMessage ?: "",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFFB91C1C)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
 
         when (recoveryStep) {
             0 -> {
@@ -699,7 +720,9 @@ fun ForgotPasswordScreen(
                 Spacer(modifier = Modifier.height(6.dp))
                 OutlinedTextField(
                     value = email,
-                    onValueChange = { email = it },
+                    onValueChange = { email = it; errorMessage = null },
+                    singleLine = true,
+                    placeholder = { Text("you@example.com", color = DarkTextSecondary) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     leadingIcon = {
@@ -716,16 +739,45 @@ fun ForgotPasswordScreen(
                     )
                 )
 
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 PrimaryYellowButton(
-                    text = "Send Verification Code",
-                    onClick = { recoveryStep = 1 }
+                    text = "Generate Recovery Code",
+                    onClick = {
+                        coroutineScope.launch {
+                            val check = viewModel.checkEmailExists(email)
+                            if (check.isSuccess) {
+                                errorMessage = null
+                                generatedOtp = (100000..999999).random().toString()
+                                otpCode = ""
+                                recoveryStep = 1
+                            } else {
+                                errorMessage = check.exceptionOrNull()?.message ?: "Account not found."
+                            }
+                        }
+                    }
                 )
             }
             1 -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(AmberBadgeBg)
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = "Local recovery OTP code: $generatedOtp",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AmberBadgeText
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
                 Text(
-                    text = "Kode Verifikasi (OTP)",
+                    text = "Verification Code (OTP)",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = DarkText
@@ -733,8 +785,9 @@ fun ForgotPasswordScreen(
                 Spacer(modifier = Modifier.height(6.dp))
                 OutlinedTextField(
                     value = otpCode,
-                    onValueChange = { if (it.length <= 6) otpCode = it },
-                    placeholder = { Text("Contoh: 482910", color = DarkTextSecondary) },
+                    onValueChange = { if (it.length <= 6) otpCode = it; errorMessage = null },
+                    singleLine = true,
+                    placeholder = { Text("Enter 6-digit code", color = DarkTextSecondary) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -748,16 +801,23 @@ fun ForgotPasswordScreen(
                     )
                 )
 
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 PrimaryYellowButton(
-                    text = "Verifikasi Kode OTP",
-                    onClick = { recoveryStep = 2 }
+                    text = "Verify OTP Code",
+                    onClick = {
+                        if (otpCode.trim() == generatedOtp && generatedOtp.isNotEmpty()) {
+                            errorMessage = null
+                            recoveryStep = 2
+                        } else {
+                            errorMessage = "Invalid verification code. Please check the code above."
+                        }
+                    }
                 )
             }
             2 -> {
                 Text(
-                    text = "Password Baru",
+                    text = "New Password",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = DarkText
@@ -765,8 +825,10 @@ fun ForgotPasswordScreen(
                 Spacer(modifier = Modifier.height(6.dp))
                 OutlinedTextField(
                     value = newPassword,
-                    onValueChange = { newPassword = it },
-                    placeholder = { Text("Masukkan password baru...", color = DarkTextSecondary) },
+                    onValueChange = { newPassword = it; errorMessage = null },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    placeholder = { Text("Minimum 6 characters", color = DarkTextSecondary) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     leadingIcon = {
@@ -783,34 +845,48 @@ fun ForgotPasswordScreen(
                     )
                 )
 
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 PrimaryYellowButton(
-                    text = "Simpan Password Baru",
-                    onClick = { recoveryStep = 3 }
+                    text = "Save New Password",
+                    onClick = {
+                        coroutineScope.launch {
+                            val res = viewModel.resetPassword(email, newPassword)
+                            if (res.isSuccess) {
+                                errorMessage = null
+                                recoveryStep = 3
+                            } else {
+                                errorMessage = res.exceptionOrNull()?.message ?: "Could not update password."
+                            }
+                        }
+                    }
                 )
             }
             else -> {
                 PrimaryYellowButton(
-                    text = "Kembali ke Login",
+                    text = "Back to Sign In",
                     onClick = onLoginClick
                 )
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(28.dp))
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.Center
         ) {
             Text("Remember your password? ", fontSize = 13.sp, color = DarkTextSecondary)
             Text(
-                text = "Log In",
+                text = "Sign In",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = DarkText,
-                modifier = Modifier.clickable(onClick = onLoginClick)
+                modifier = Modifier
+                    .clickable(onClick = onLoginClick)
+                    .padding(horizontal = 4.dp)
             )
         }
     }

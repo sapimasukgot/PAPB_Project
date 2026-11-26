@@ -13,38 +13,38 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.HelpOutline
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Publish
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -62,13 +62,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.easycooking.model.AlarmSoundPreset
+import com.example.easycooking.model.Recipe
+import com.example.easycooking.ui.components.AlarmSoundPickerDialog
 import com.example.easycooking.ui.components.PrimaryYellowButton
+import com.example.easycooking.ui.components.RecipeImageBox
+import com.example.easycooking.ui.theme.AmberBadgeBg
+import com.example.easycooking.ui.theme.AmberBadgeText
 import com.example.easycooking.ui.theme.DarkText
 import com.example.easycooking.ui.theme.DarkTextSecondary
 import com.example.easycooking.ui.theme.LightGrayBg
 import com.example.easycooking.ui.theme.PrimaryYellow
 import com.example.easycooking.ui.theme.StarYellow
 import com.example.easycooking.viewmodel.CookingViewModel
+import kotlin.math.roundToInt
 
 @Composable
 fun AccountScreen(
@@ -82,22 +89,59 @@ fun AccountScreen(
     var offlineBannerVisible by remember { mutableStateOf(true) }
     var selectedTab by remember { mutableIntStateOf(0) }
     val isMetricUnit by viewModel.isMetricUnit.collectAsState()
+    val alarmSoundId by viewModel.alarmSoundId.collectAsState()
+    val customAlarmName by viewModel.customAlarmName.collectAsState()
+    val isPreviewingAlarm by viewModel.isPreviewingAlarm.collectAsState()
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
     val loggedInName by viewModel.loggedInName.collectAsState()
     val loggedInEmail by viewModel.loggedInEmail.collectAsState()
     val allRecipes by viewModel.recipes.collectAsState()
-    val myPublishedRecipes = allRecipes.filter {
-        it.chefName.equals(loggedInName, ignoreCase = true) || it.id.startsWith("user_rec_")
+    val groceryLists by viewModel.groceryLists.collectAsState()
+
+    val savedRecipesCount = allRecipes.count { !it.isDraft && it.isBookmarked }
+    val groceryItemsRemainingCount = groceryLists.filter { !it.isCompleted }.sumOf { it.remainingItems }
+
+    val myRecipes = allRecipes.filter { recipe ->
+        isLoggedIn && (
+            recipe.ownerEmail.equals(loggedInEmail, ignoreCase = true) ||
+                (recipe.ownerEmail.isBlank() && recipe.chefName.equals(loggedInName, ignoreCase = true))
+            )
     }
+    val myPublishedRecipes = myRecipes.filter { !it.isDraft }
+    val myDraftRecipes = myRecipes.filter { it.isDraft }
+
     var showAuthDialog by remember { mutableStateOf(false) }
     var authDialogReason by remember { mutableStateOf("") }
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
+    var showHelpDialog by remember { mutableStateOf(false) }
+    var showAlarmDialog by remember { mutableStateOf(false) }
+    var recipeToDelete by remember { mutableStateOf<Recipe?>(null) }
+
+    val activeAlarmPreset = AlarmSoundPreset.fromId(alarmSoundId)
+    val activeAlarmLabel = if (activeAlarmPreset == AlarmSoundPreset.CUSTOM && customAlarmName.isNotBlank()) {
+        customAlarmName
+    } else {
+        activeAlarmPreset.label
+    }
+
+    if (showAlarmDialog) {
+        AlarmSoundPickerDialog(
+            selectedSoundId = alarmSoundId,
+            customAudioName = customAlarmName,
+            isPreviewing = isPreviewingAlarm,
+            onSelectPreset = { viewModel.selectAlarmPreset(it) },
+            onPickCustomAudio = { uri, cb -> viewModel.saveCustomAlarmFromUri(uri, cb) },
+            onTogglePreview = { viewModel.previewAlarmSound() },
+            onStopPreview = { viewModel.stopAlarm() },
+            onDismiss = { showAlarmDialog = false }
+        )
+    }
 
     if (showAuthDialog) {
         AlertDialog(
             onDismissRequest = { showAuthDialog = false },
             title = {
-                Text("Fitur Khusus Pengguna Terdaftar", fontWeight = FontWeight.Bold, color = DarkText)
+                Text("Member Feature", fontWeight = FontWeight.Bold, color = DarkText)
             },
             text = {
                 Text(authDialogReason, fontSize = 13.sp, color = DarkTextSecondary)
@@ -110,12 +154,12 @@ fun AccountScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryYellow, contentColor = DarkText)
                 ) {
-                    Text("Masuk / Daftar", fontWeight = FontWeight.Bold)
+                    Text("Sign In / Register", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showAuthDialog = false }) {
-                    Text("Batal", color = DarkText)
+                    Text("Cancel", color = DarkText)
                 }
             }
         )
@@ -125,10 +169,14 @@ fun AccountScreen(
         AlertDialog(
             onDismissRequest = { showDeleteAccountDialog = false },
             title = {
-                Text("Hapus Akun", fontWeight = FontWeight.Bold, color = Color(0xFFDC2626))
+                Text("Delete Account", fontWeight = FontWeight.Bold, color = Color(0xFFB91C1C))
             },
             text = {
-                Text("Apakah Anda yakin ingin menghapus akun Anda? Seluruh data akun akan dihapus secara permanen.", fontSize = 13.sp, color = DarkTextSecondary)
+                Text(
+                    "Are you sure you want to delete your account? All personal recipes, drafts, and grocery lists will be permanently removed.",
+                    fontSize = 13.sp,
+                    color = DarkTextSecondary
+                )
             },
             confirmButton = {
                 Button(
@@ -138,24 +186,66 @@ fun AccountScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626), contentColor = Color.White)
                 ) {
-                    Text("Hapus", fontWeight = FontWeight.Bold)
+                    Text("Delete", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteAccountDialog = false }) {
-                    Text("Batal", color = DarkText)
+                    Text("Cancel", color = DarkText)
                 }
             }
         )
     }
 
-    val creatorRecipes = listOf(
-        Triple("Creamy Truffle Risotto", "Dinner | 25m | Published", "4.9"),
-        Triple("Pan-Seared Salmon Salad", "Lunch | 15m | Published", "4.8"),
-        Triple("Garlic Butter Steak Bites", "Dinner | 20m | Published", "5.0"),
-        Triple("Honey Glazed Salmon", "Dinner | 18m | Published", "4.9"),
-        Triple("Classic Margherita Pizza", "Dinner | 30m | Published", "4.7")
-    )
+    if (recipeToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { recipeToDelete = null },
+            title = { Text("Delete Recipe", fontWeight = FontWeight.Bold, color = Color(0xFFB91C1C)) },
+            text = {
+                Text("Delete \"${recipeToDelete?.title}\" permanently?", fontSize = 13.sp, color = DarkTextSecondary)
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        recipeToDelete?.let { viewModel.deleteRecipe(it.id) }
+                        recipeToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626), contentColor = Color.White)
+                ) {
+                    Text("Delete", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { recipeToDelete = null }) {
+                    Text("Cancel", color = DarkText)
+                }
+            }
+        )
+    }
+
+    if (showHelpDialog) {
+        AlertDialog(
+            onDismissRequest = { showHelpDialog = false },
+            title = { Text("EasyCooking Help & FAQ", fontWeight = FontWeight.Bold, color = DarkText) },
+            text = {
+                Text(
+                    "1. Dietary & Allergies: Toggle Strict Allergen Filter to automatically hide unsafe recipes.\n" +
+                        "2. Cooking Mode: Keeps the screen awake and includes a +1 min timer grace window before advancing steps.\n" +
+                        "3. Grocery Lists: Export scaled ingredients from any recipe and track items by aisle.",
+                    fontSize = 13.sp,
+                    color = DarkTextSecondary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showHelpDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryYellow, contentColor = DarkText)
+                ) {
+                    Text("Got it", fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -187,13 +277,13 @@ fun AccountScreen(
                                 containerColor = PrimaryYellow,
                                 contentColor = DarkText
                             ),
-                            modifier = Modifier.height(36.dp)
+                            modifier = Modifier.height(40.dp)
                         ) {
                             Text("+ New", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     } else {
-                        IconButton(onClick = { }) {
-                            Icon(Icons.Filled.HelpOutline, contentDescription = "Help", tint = DarkText)
+                        IconButton(onClick = { showHelpDialog = true }) {
+                            Icon(Icons.AutoMirrored.Filled.HelpOutline, contentDescription = "Help", tint = DarkText)
                         }
                     }
                 }
@@ -208,20 +298,20 @@ fun AccountScreen(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
                             .background(LightGrayBg)
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                            .padding(start = 14.dp, top = 6.dp, bottom = 6.dp, end = 6.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.Shield, contentDescription = null, tint = Color(0xFFB45309), modifier = Modifier.size(18.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Filled.Shield, contentDescription = null, tint = AmberBadgeText, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
-                                Text("Offline Mode", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DarkText)
-                                Text("Your culinary bookmarks are saved locally.", fontSize = 11.sp, color = DarkTextSecondary)
+                                Text("Local Storage Active", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                                Text("Your recipes, bookmarks, and lists stay saved on this device.", fontSize = 11.sp, color = DarkTextSecondary)
                             }
                         }
-                        IconButton(onClick = { offlineBannerVisible = false }, modifier = Modifier.size(20.dp)) {
-                            Icon(Icons.Filled.Close, contentDescription = "Dismiss", tint = DarkTextSecondary, modifier = Modifier.size(16.dp))
+                        IconButton(onClick = { offlineBannerVisible = false }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Dismiss", tint = DarkTextSecondary, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -258,13 +348,13 @@ fun AccountScreen(
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = if (isLoggedIn) "- Member" else "- Local Storage",
+                                        text = if (isLoggedIn) "- Member" else "- Guest",
                                         fontSize = 11.sp,
                                         color = DarkTextSecondary
                                     )
                                 }
                                 Text(
-                                    text = if (isLoggedIn && loggedInEmail.isNotBlank()) loggedInEmail else "Sign in to sync recipes & grocery items across devices.",
+                                    text = if (isLoggedIn && loggedInEmail.isNotBlank()) loggedInEmail else "Sign in to access saved recipes, creator mode & grocery lists.",
                                     fontSize = 11.sp,
                                     color = DarkTextSecondary
                                 )
@@ -282,8 +372,8 @@ fun AccountScreen(
                                     .padding(10.dp)
                             ) {
                                 Column {
-                                    Text("4 Recipes", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = DarkText)
-                                    Text("Unsynced", fontSize = 11.sp, color = DarkTextSecondary)
+                                    Text("$savedRecipesCount Saved", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                                    Text("Bookmarked Recipes", fontSize = 11.sp, color = DarkTextSecondary)
                                 }
                             }
 
@@ -295,8 +385,8 @@ fun AccountScreen(
                                     .padding(10.dp)
                             ) {
                                 Column {
-                                    Text("12 Items", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = DarkText)
-                                    Text("In Pantry", fontSize = 11.sp, color = DarkTextSecondary)
+                                    Text("$groceryItemsRemainingCount Items", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                                    Text("To Buy", fontSize = 11.sp, color = DarkTextSecondary)
                                 }
                             }
                         }
@@ -307,9 +397,11 @@ fun AccountScreen(
                             OutlinedButton(
                                 onClick = { viewModel.logout() },
                                 shape = RoundedCornerShape(20.dp),
-                                modifier = Modifier.fillMaxWidth().height(48.dp)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
                             ) {
-                                Text("Sign Out", fontWeight = FontWeight.Bold, color = Color(0xFFDC2626))
+                                Text("Sign Out", fontWeight = FontWeight.Bold, color = Color(0xFFB91C1C))
                             }
                         } else {
                             PrimaryYellowButton(
@@ -326,31 +418,37 @@ fun AccountScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     AccountMenuItem(
                         title = "App Preferences & Allergies",
-                        subtitle = "Manage filters & notifications",
+                        subtitle = "Manage dietary filters and strict allergen protection",
                         onClick = onDietaryPreferencesClick
                     )
                     AccountMenuItem(
                         title = "Measurement Units",
-                        subtitle = if (isMetricUnit) "Grams, milliliters, and Celsius | Metric (g, ml)" else "Ounces, cups, and Fahrenheit | Imperial (oz, cups)",
+                        subtitle = if (isMetricUnit) "Grams & milliliters (Metric)" else "Ounces & fluid ounces (Imperial)",
                         trailingBadge = if (isMetricUnit) "Metric" else "Imperial",
                         onClick = {
                             if (isLoggedIn) {
                                 viewModel.toggleMeasurementUnit()
                             } else {
-                                authDialogReason = "Mengonversi satuan takaran hanya dapat dilakukan oleh pengguna terdaftar."
+                                authDialogReason = "Please sign in or register to customize measurement units."
                                 showAuthDialog = true
                             }
                         }
                     )
                     AccountMenuItem(
+                        title = "Timer Alarm Sound",
+                        subtitle = "Choose a built-in chime or custom audio file",
+                        trailingBadge = activeAlarmLabel,
+                        onClick = { showAlarmDialog = true }
+                    )
+                    AccountMenuItem(
                         title = "Switch to Creator View",
-                        subtitle = "View published recipes & analytics",
+                        subtitle = "Manage your published recipes & drafts",
                         trailingBadge = "Creator",
                         onClick = {
                             if (isLoggedIn) {
                                 isCreatorMode = true
                             } else {
-                                authDialogReason = "Fitur resep pribadi dan mode kreator hanya dapat diakses oleh pengguna terdaftar."
+                                authDialogReason = "Please sign in or register to access Creator Mode."
                                 showAuthDialog = true
                             }
                         }
@@ -358,46 +456,22 @@ fun AccountScreen(
                     if (isLoggedIn) {
                         AccountMenuItem(
                             title = "Delete Account",
-                            subtitle = "Permanently remove your account and data",
+                            subtitle = "Permanently remove your account and local data",
                             onClick = { showDeleteAccountDialog = true }
                         )
                     }
                     AccountMenuItem(
                         title = "Help & Support",
-                        subtitle = "FAQ, kitchen tips & contact us",
-                        onClick = { }
+                        subtitle = "FAQ & kitchen tips",
+                        onClick = { showHelpDialog = true }
                     )
                 }
                 Spacer(modifier = Modifier.height(20.dp))
             }
 
             item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(LightGrayBg)
-                        .padding(14.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(50.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0xFFCBD5E1))
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text("RECIPE OF THE DAY", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = DarkTextSecondary)
-                            Text("Golden Artisan Sourdough", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DarkText)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
                 Text(
-                    text = "Savor Kitchen Companion | v2.4.0 (${if (isLoggedIn) "Registered User" else "Guest"})",
+                    text = "EasyCooking | v1.0 (${if (isLoggedIn) "Member" else "Guest"})",
                     fontSize = 11.sp,
                     color = DarkTextSecondary,
                     textAlign = TextAlign.Center,
@@ -421,10 +495,10 @@ fun AccountScreen(
                                 modifier = Modifier
                                     .size(54.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFFFEF3C7)),
+                                    .background(AmberBadgeBg),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Filled.Person, contentDescription = null, tint = Color(0xFFB45309), modifier = Modifier.size(32.dp))
+                                Icon(Icons.Filled.Person, contentDescription = null, tint = AmberBadgeText, modifier = Modifier.size(32.dp))
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
@@ -440,13 +514,14 @@ fun AccountScreen(
                                         Text("Creator", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = DarkText)
                                     }
                                 }
-                                Text("${myPublishedRecipes.size} Published", fontSize = 12.sp, color = DarkTextSecondary)
+                                Text("${myPublishedRecipes.size} Published | ${myDraftRecipes.size} Drafts", fontSize = 12.sp, color = DarkTextSecondary)
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                val avgRating = if (myPublishedRecipes.isNotEmpty()) {
-                                    val avg = myPublishedRecipes.map { it.rating }.average()
-                                    Math.round(avg * 10.0) / 10.0
-                                } else 5.0
+                                val ratedRecipes = myPublishedRecipes.filter { it.reviewCount > 0 }
+                                val avgRating = if (ratedRecipes.isNotEmpty()) {
+                                    val avg = ratedRecipes.map { it.rating }.average()
+                                    (avg * 10.0).roundToInt() / 10.0
+                                } else 0.0
                                 Text(avgRating.toString(), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DarkText)
                                 Icon(Icons.Filled.Star, contentDescription = null, tint = StarYellow, modifier = Modifier.size(16.dp))
                             }
@@ -458,10 +533,10 @@ fun AccountScreen(
                             text = "Exit Creator Mode",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFFB45309),
+                            color = AmberBadgeText,
                             modifier = Modifier
                                 .clickable { isCreatorMode = false }
-                                .padding(vertical = 4.dp)
+                                .padding(vertical = 8.dp, horizontal = 4.dp)
                         )
                     }
                 }
@@ -469,13 +544,13 @@ fun AccountScreen(
             }
 
             item {
-                TabRow(
+                PrimaryTabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = Color.White,
                     contentColor = DarkText,
-                    indicator = { tabPositions ->
-                        TabRowDefaults.SecondaryIndicator(
-                            modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                    indicator = {
+                        TabRowDefaults.PrimaryIndicator(
+                            modifier = Modifier.tabIndicatorOffset(selectedTab, matchContentSize = true),
                             color = PrimaryYellow
                         )
                     }
@@ -488,72 +563,104 @@ fun AccountScreen(
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = { Text("Drafts (0)", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                        text = { Text("Drafts (${myDraftRecipes.size})", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
                     )
                 }
                 Spacer(modifier = Modifier.height(14.dp))
             }
 
-            if (selectedTab == 0) {
-                if (myPublishedRecipes.isEmpty()) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("Belum ada resep yang dipublikasikan", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = DarkText)
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text("Mulai unggah resep masakan Anda sekarang.", fontSize = 12.sp, color = DarkTextSecondary)
-                                Spacer(modifier = Modifier.height(14.dp))
-                                Button(
-                                    onClick = onNewRecipeClick,
-                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryYellow, contentColor = DarkText),
-                                    shape = RoundedCornerShape(20.dp)
-                                ) {
-                                    Text("+ Buat Resep Baru", fontWeight = FontWeight.Bold)
-                                }
+            val displayedCreatorRecipes = if (selectedTab == 0) myPublishedRecipes else myDraftRecipes
+
+            if (displayedCreatorRecipes.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = if (selectedTab == 0) "No published recipes yet" else "No saved drafts",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                color = DarkText
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = if (selectedTab == 0) "Create and share your first homemade recipe." else "Save a recipe as draft during upload to resume later.",
+                                fontSize = 12.sp,
+                                color = DarkTextSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Button(
+                                onClick = onNewRecipeClick,
+                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryYellow, contentColor = DarkText),
+                                shape = RoundedCornerShape(20.dp)
+                            ) {
+                                Text("+ Create New Recipe", fontWeight = FontWeight.Bold)
                             }
                         }
                     }
-                } else {
-                    items(myPublishedRecipes) { recipe ->
-                        Row(
+                }
+            } else {
+                items(displayedCreatorRecipes, key = { it.id }) { recipe ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 5.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(LightGrayBg)
+                            .clickable { onRecipeClick(recipe.id) }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RecipeImageBox(
+                            imageUri = recipe.imageUri,
+                            fallbackColor = Color(0xFFCBD5E1),
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 5.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(LightGrayBg)
-                                .clickable { onRecipeClick(recipe.id) }
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .size(52.dp)
+                                .clip(RoundedCornerShape(10.dp))
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(52.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Color(0xFFCBD5E1)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Filled.Restaurant, contentDescription = null, tint = DarkTextSecondary, modifier = Modifier.size(24.dp))
+                            if (recipe.imageUri.isBlank()) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Filled.Restaurant, contentDescription = null, tint = DarkTextSecondary, modifier = Modifier.size(24.dp))
+                                }
                             }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(recipe.title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DarkText)
-                                Text("${recipe.category} | ${recipe.durationMinutes}m | Published", fontSize = 11.sp, color = DarkTextSecondary)
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(recipe.title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                            val statusText = when {
+                                recipe.isDraft && recipe.ingredients.isEmpty() -> "Draft (no ingredients)"
+                                recipe.isDraft -> "Draft"
+                                else -> "Published"
                             }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("${recipe.category} | ${recipe.durationMinutes}m | $statusText", fontSize = 11.sp, color = DarkTextSecondary)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (recipe.isDraft) {
+                                val canPublishDraft = recipe.ingredients.isNotEmpty()
+                                IconButton(
+                                    onClick = { viewModel.publishExistingDraft(recipe) },
+                                    enabled = canPublishDraft
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Publish,
+                                        contentDescription = "Publish Draft",
+                                        tint = if (canPublishDraft) DarkText else DarkTextSecondary.copy(alpha = 0.4f)
+                                    )
+                                }
+                            } else {
                                 Text(recipe.rating.toString(), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DarkText)
                                 Icon(Icons.Filled.Star, contentDescription = null, tint = StarYellow, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                IconButton(
-                                    onClick = { viewModel.deleteRecipe(recipe.id) },
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Icon(Icons.Filled.Delete, contentDescription = "Hapus", tint = Color(0xFFDC2626), modifier = Modifier.size(18.dp))
-                                }
+                            }
+                            IconButton(onClick = { recipeToDelete = recipe }) {
+                                Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color(0xFFB91C1C))
                             }
                         }
                     }
@@ -577,6 +684,7 @@ private fun AccountMenuItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .sizeIn(minHeight = 56.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(LightGrayBg)
             .clickable(onClick = onClick)
@@ -592,10 +700,10 @@ private fun AccountMenuItem(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0xFFFEF3C7))
+                    .background(AmberBadgeBg)
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
-                Text(trailingBadge, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFB45309))
+                Text(trailingBadge, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AmberBadgeText)
             }
             Spacer(modifier = Modifier.width(6.dp))
         }
@@ -614,16 +722,19 @@ fun DietaryAllergiesScreen(
     val strictFilter by viewModel.strictAllergenFilter.collectAsState()
 
     val lifestyles = listOf("Vegetarian", "Keto", "Vegan", "Gluten-Free", "Pescatarian", "Dairy-Free")
-    val allergens = listOf("Peanuts", "Shellfish", "Eggs", "Tree Nuts", "Wheat", "Soy")
+    val allergens = listOf("Dairy", "Gluten", "Fish", "Shellfish", "Eggs", "Tree Nuts", "Soy", "Peanuts")
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.SpaceBetween
+            .padding(16.dp)
     ) {
-        Column {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -635,7 +746,14 @@ fun DietaryAllergiesScreen(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = DarkText)
                 }
                 Text("Dietary & Allergies", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkText)
-                Text("Skip", fontSize = 14.sp, color = DarkTextSecondary, modifier = Modifier.clickable(onClick = onBackClick))
+                Text(
+                    "Skip",
+                    fontSize = 14.sp,
+                    color = DarkTextSecondary,
+                    modifier = Modifier
+                        .clickable(onClick = onBackClick)
+                        .padding(horizontal = 8.dp, vertical = 12.dp)
+                )
             }
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -671,10 +789,12 @@ fun DietaryAllergiesScreen(
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
+                                    .sizeIn(minHeight = 48.dp)
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(if (isSelected) PrimaryYellow else LightGrayBg)
                                     .clickable { viewModel.toggleDietaryLifestyle(lifestyle) }
-                                    .padding(vertical = 12.dp, horizontal = 12.dp)
+                                    .padding(vertical = 12.dp, horizontal = 12.dp),
+                                contentAlignment = Alignment.CenterStart
                             ) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -720,10 +840,12 @@ fun DietaryAllergiesScreen(
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
+                                    .sizeIn(minHeight = 48.dp)
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(if (isSelected) PrimaryYellow else LightGrayBg)
                                     .clickable { viewModel.toggleAllergen(allergen) }
-                                    .padding(vertical = 12.dp, horizontal = 12.dp)
+                                    .padding(vertical = 12.dp, horizontal = 12.dp),
+                                contentAlignment = Alignment.CenterStart
                             ) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -741,6 +863,9 @@ fun DietaryAllergiesScreen(
                                     }
                                 }
                             }
+                        }
+                        if (rowItems.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
                         }
                     }
                 }
@@ -765,10 +890,10 @@ fun DietaryAllergiesScreen(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFFFEF3C7)),
+                            .background(AmberBadgeBg),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Filled.Security, contentDescription = null, tint = Color(0xFFB45309), modifier = Modifier.size(20.dp))
+                        Icon(Icons.Filled.Security, contentDescription = null, tint = AmberBadgeText, modifier = Modifier.size(20.dp))
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
@@ -782,6 +907,8 @@ fun DietaryAllergiesScreen(
                     colors = SwitchDefaults.colors(checkedThumbColor = DarkText, checkedTrackColor = PrimaryYellow)
                 )
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -791,7 +918,7 @@ fun DietaryAllergiesScreen(
                 onClick = onSaveSuccess
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             TextButton(
                 onClick = onBackClick,

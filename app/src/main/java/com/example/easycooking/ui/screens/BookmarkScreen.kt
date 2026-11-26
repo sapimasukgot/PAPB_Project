@@ -16,10 +16,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Lock
@@ -63,7 +63,9 @@ fun SavedScreen(
 ) {
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
     val recipes by viewModel.recipes.collectAsState()
-    val savedRecipes = recipes.filter { it.isBookmarked }
+    val curatedRecipes by viewModel.curatedRecipes.collectAsState()
+    val groceryLists by viewModel.groceryLists.collectAsState()
+    val savedRecipes = recipes.filter { !it.isDraft && it.isBookmarked }
 
     var selectedCategory by remember { mutableStateOf("All") }
     val categories = listOf("All", "Breakfast", "Quick Dinners", "Desserts")
@@ -102,7 +104,7 @@ fun SavedScreen(
                             containerColor = PrimaryYellow,
                             contentColor = DarkText
                         ),
-                        modifier = Modifier.height(38.dp)
+                        modifier = Modifier.height(40.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Filled.Add, contentDescription = null, tint = DarkText, modifier = Modifier.size(16.dp))
@@ -134,14 +136,14 @@ fun SavedScreen(
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "Simpan Resep Favorit",
+                            text = "Save Your Favorite Recipes",
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             color = DarkText
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Fitur bookmark dan resep tersimpan hanya tersedia untuk pengguna terdaftar.",
+                            text = "Sign in or create an account to bookmark recipes and view your saved collection.",
                             fontSize = 12.sp,
                             color = DarkTextSecondary,
                             textAlign = TextAlign.Center
@@ -155,7 +157,7 @@ fun SavedScreen(
                                 contentColor = DarkText
                             )
                         ) {
-                            Text("Masuk / Daftar Akun", fontWeight = FontWeight.Bold)
+                            Text("Sign In / Register", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -165,7 +167,7 @@ fun SavedScreen(
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(categories) { category ->
+                    items(categories, key = { it }) { category ->
                         val isSelected = category == selectedCategory
                         val label = if (category == "All") "All (${savedRecipes.size})" else category
                         Box(
@@ -173,7 +175,7 @@ fun SavedScreen(
                                 .clip(RoundedCornerShape(20.dp))
                                 .background(if (isSelected) PrimaryYellow else LightGrayBg)
                                 .clickable { selectedCategory = category }
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
                         ) {
                             Text(
                                 text = label,
@@ -199,7 +201,7 @@ fun SavedScreen(
                         color = DarkTextSecondary
                     )
                     Text(
-                        text = "Sorted by: Recent",
+                        text = "${savedRecipes.size} saved",
                         fontSize = 12.sp,
                         color = DarkTextSecondary
                     )
@@ -210,85 +212,132 @@ fun SavedScreen(
             item {
                 val filteredRecipes = when (selectedCategory) {
                     "All" -> savedRecipes
-                    "Quick Dinners" -> savedRecipes.filter { it.category.contains("Dinner", ignoreCase = true) || it.durationMinutes <= 30 }
-                    else -> savedRecipes.filter { it.category.contains(selectedCategory.trimEnd('s'), ignoreCase = true) }
+                    "Quick Dinners" -> savedRecipes.filter {
+                        it.category.equals("Dinner", ignoreCase = true) && it.durationMinutes <= 30
+                    }
+                    "Desserts" -> savedRecipes.filter { it.category.equals("Dessert", ignoreCase = true) }
+                    else -> savedRecipes.filter { it.category.equals(selectedCategory, ignoreCase = true) }
                 }
-                val chunkedList = filteredRecipes.chunked(2)
 
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    chunkedList.forEach { rowRecipes ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            rowRecipes.forEach { recipe ->
-                                RecipeCardGrid(
-                                    recipe = recipe,
-                                    onClick = { onRecipeClick(recipe.id) },
-                                    onBookmarkToggle = { viewModel.toggleBookmark(recipe.id) },
-                                    modifier = Modifier.weight(1f)
-                                )
+                if (filteredRecipes.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(LightGrayBg)
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Filled.BookmarkBorder,
+                                contentDescription = null,
+                                tint = DarkTextSecondary,
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "No saved recipes in $selectedCategory",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = DarkText
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Bookmark recipes from Discover to find them quickly here.",
+                                fontSize = 12.sp,
+                                color = DarkTextSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = onBrowseClick,
+                                shape = RoundedCornerShape(18.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryYellow, contentColor = DarkText)
+                            ) {
+                                Text("Browse Recipes", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
-                            if (rowRecipes.size == 1) {
-                                Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                } else {
+                    val chunkedList = filteredRecipes.chunked(2)
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        chunkedList.forEach { rowRecipes ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                rowRecipes.forEach { recipe ->
+                                    RecipeCardGrid(
+                                        recipe = recipe,
+                                        onClick = { onRecipeClick(recipe.id) },
+                                        onBookmarkToggle = { viewModel.toggleBookmark(recipe.id) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                if (rowRecipes.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
                             }
                         }
                     }
                 }
                 Spacer(modifier = Modifier.height(20.dp))
             }
-        }
 
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(LightGrayBg)
-                    .padding(14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            item {
+                val activeListsCount = groceryLists.count { !it.isCompleted }
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(LightGrayBg)
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(PrimaryYellow),
-                        contentAlignment = Alignment.Center
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Filled.CalendarToday, contentDescription = null, tint = DarkText, modifier = Modifier.size(20.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(PrimaryYellow),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.CalendarToday, contentDescription = null, tint = DarkText, modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Ready for dinner?",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = DarkText
+                            )
+                            Text(
+                                text = "$activeListsCount active grocery list(s)",
+                                fontSize = 11.sp,
+                                color = DarkTextSecondary
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "Ready for dinner?",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = DarkText
-                        )
-                        Text(
-                            text = "4 recipes planned for this week",
-                            fontSize = 11.sp,
-                            color = DarkTextSecondary
-                        )
-                    }
-                }
 
-                OutlinedButton(
-                    onClick = onOpenPlanClick,
-                    shape = RoundedCornerShape(18.dp)
-                ) {
-                    Text("Open Plan", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                    OutlinedButton(
+                        onClick = onOpenPlanClick,
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
+                        Text("Open List", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                    }
                 }
+                Spacer(modifier = Modifier.height(12.dp))
             }
-            Spacer(modifier = Modifier.height(12.dp))
         }
 
         item {
+            val publishedCount = curatedRecipes.size
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -310,7 +359,7 @@ fun SavedScreen(
                             color = DarkText
                         )
                         Text(
-                            text = "Explore 80+ seasonal dinner ideas",
+                            text = "Explore $publishedCount curated recipes",
                             fontSize = 11.sp,
                             color = DarkTextSecondary
                         )

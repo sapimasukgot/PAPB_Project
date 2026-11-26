@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,11 +14,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
@@ -39,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.easycooking.ui.components.PrimaryYellowButton
+import com.example.easycooking.ui.theme.AmberBadgeText
 import com.example.easycooking.ui.theme.DarkText
 import com.example.easycooking.ui.theme.DarkTextSecondary
 import com.example.easycooking.ui.theme.LightGrayBg
@@ -46,9 +51,11 @@ import com.example.easycooking.ui.theme.PrimaryYellow
 import com.example.easycooking.ui.theme.StarYellow
 import com.example.easycooking.viewmodel.CookingViewModel
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun WriteReviewScreen(
     recipeId: String,
+    initialRating: Int = 5,
     viewModel: CookingViewModel,
     onBackClick: () -> Unit,
     onSubmitSuccess: () -> Unit
@@ -56,8 +63,9 @@ fun WriteReviewScreen(
     val recipes by viewModel.recipes.collectAsState()
     val recipe = recipes.find { it.id == recipeId } ?: recipes.firstOrNull() ?: return
 
-    var selectedRating by remember { mutableIntStateOf(5) }
+    var selectedRating by remember(initialRating) { mutableIntStateOf(initialRating.coerceIn(1, 5)) }
     var reviewComment by remember { mutableStateOf("") }
+    var commentError by remember { mutableStateOf<String?>(null) }
     var selectedHighlights by remember { mutableStateOf(setOf("Easy to Follow", "Great Flavor")) }
 
     val highlightTags = listOf("Easy to Follow", "Accurate Time", "Great Flavor")
@@ -66,10 +74,13 @@ fun WriteReviewScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.SpaceBetween
+            .padding(16.dp)
     ) {
-        Column {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -90,7 +101,9 @@ fun WriteReviewScreen(
                     text = "Cancel",
                     fontSize = 14.sp,
                     color = DarkTextSecondary,
-                    modifier = Modifier.clickable(onClick = onBackClick)
+                    modifier = Modifier
+                        .clickable(onClick = onBackClick)
+                        .padding(horizontal = 8.dp, vertical = 12.dp)
                 )
             }
 
@@ -134,14 +147,19 @@ fun WriteReviewScreen(
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     (1..5).forEach { star ->
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = "$star stars",
-                            tint = if (star <= selectedRating) StarYellow else Color.LightGray,
+                        Box(
                             modifier = Modifier
-                                .size(38.dp)
-                                .clickable { selectedRating = star }
-                        )
+                                .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                                .clickable { selectedRating = star },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = "$star stars",
+                                tint = if (star <= selectedRating) StarYellow else Color.LightGray,
+                                modifier = Modifier.size(36.dp)
+                            )
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -157,7 +175,13 @@ fun WriteReviewScreen(
 
             OutlinedTextField(
                 value = reviewComment,
-                onValueChange = { if (it.length <= 250) reviewComment = it },
+                onValueChange = {
+                    if (it.length <= 250) {
+                        reviewComment = it
+                        commentError = null
+                    }
+                },
+                isError = commentError != null,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(130.dp),
@@ -180,6 +204,16 @@ fun WriteReviewScreen(
                 )
             )
 
+            if (commentError != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = commentError ?: "",
+                    fontSize = 12.sp,
+                    color = Color(0xFFB91C1C),
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -189,7 +223,7 @@ fun WriteReviewScreen(
                 Text(
                     text = "Cooking tips help others!",
                     fontSize = 11.sp,
-                    color = Color(0xFFB45309)
+                    color = AmberBadgeText
                 )
                 Text(
                     text = "${reviewComment.length}/250",
@@ -210,7 +244,10 @@ fun WriteReviewScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 highlightTags.forEach { tag ->
                     val isSelected = selectedHighlights.contains(tag)
                     Box(
@@ -224,7 +261,7 @@ fun WriteReviewScreen(
                                     selectedHighlights + tag
                                 }
                             }
-                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (isSelected) {
@@ -233,7 +270,7 @@ fun WriteReviewScreen(
                             }
                             Text(
                                 text = tag,
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = if (isSelected) Color.White else DarkText
                             )
@@ -243,35 +280,17 @@ fun WriteReviewScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(LightGrayBg)
-                    .clickable { }
-                    .padding(vertical = 12.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.AddAPhoto, contentDescription = null, tint = DarkTextSecondary, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Add Photo (Optional)",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = DarkText
-                    )
-                }
-            }
         }
 
         PrimaryYellowButton(
             text = "Submit Review",
             onClick = {
-                val commentToSubmit = if (reviewComment.isBlank()) "Amazing recipe! Perfect taste and easy to make." else reviewComment
-                viewModel.addReview(recipe.id, selectedRating, commentToSubmit)
-                onSubmitSuccess()
+                if (reviewComment.isBlank()) {
+                    commentError = "Please write a brief comment before submitting."
+                } else {
+                    viewModel.addReview(recipe.id, selectedRating, reviewComment, selectedHighlights)
+                    onSubmitSuccess()
+                }
             }
         )
     }
