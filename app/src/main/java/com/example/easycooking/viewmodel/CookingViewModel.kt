@@ -13,6 +13,7 @@ import com.example.easycooking.data.repository.AppRepository
 import com.example.easycooking.model.AlarmSoundPreset
 import com.example.easycooking.model.DraftIngredientInput
 import com.example.easycooking.model.ExportGroceryResult
+import com.example.easycooking.model.ExportGroceryStatus
 import com.example.easycooking.model.FilterState
 import com.example.easycooking.model.GroceryCategories
 import com.example.easycooking.model.GroceryList
@@ -89,7 +90,7 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
     val isPreviewingAlarm: StateFlow<Boolean> = _isPreviewingAlarm.asStateFlow()
 
     val isLoggedIn: StateFlow<Boolean> = repository.preferencesManager.isLoggedInFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     val rememberMe: StateFlow<Boolean> = repository.preferencesManager.rememberMeFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -101,10 +102,10 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
     val startupAuthChecked: StateFlow<Boolean> = _startupAuthChecked.asStateFlow()
 
     val loggedInEmail: StateFlow<String> = repository.preferencesManager.loggedInEmailFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
     val loggedInName: StateFlow<String> = repository.preferencesManager.loggedInNameFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
     private var activeDetailRecipeId: String? = null
     private val _servingsCount = MutableStateFlow(2)
@@ -303,6 +304,12 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
                 currentSet + ingredientId
             }
             map + (recipeId to updatedSet)
+        }
+    }
+
+    fun setDetailIngredientsChecked(recipeId: String, ingredientIds: Set<String>) {
+        _detailCheckedIngredients.update { map ->
+            if (ingredientIds.isEmpty()) map - recipeId else map + (recipeId to ingredientIds)
         }
     }
 
@@ -556,10 +563,14 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
     fun exportRecipeToGrocery(
         recipe: Recipe,
         targetServings: Int = _servingsCount.value,
+        selectedIngredientIds: Set<String> = emptySet(),
         onResult: (ExportGroceryResult) -> Unit = {}
     ) {
         viewModelScope.launch {
-            val result = repository.exportRecipeToGrocery(recipe, targetServings)
+            val result = repository.exportRecipeToGrocery(recipe, targetServings, selectedIngredientIds)
+            if (result.status == ExportGroceryStatus.SUCCESS && selectedIngredientIds.isNotEmpty()) {
+                setDetailIngredientsChecked(recipe.id, emptySet())
+            }
             onResult(result)
         }
     }
@@ -749,7 +760,13 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun addReview(recipeId: String, rating: Int, comment: String, highlights: Set<String> = emptySet()) {
+    fun addReview(
+        recipeId: String,
+        rating: Int,
+        comment: String,
+        highlights: Set<String> = emptySet(),
+        onCompleted: () -> Unit = {}
+    ) {
         val cleanComment = comment.trim()
         if (cleanComment.isBlank()) return
         val formattedComment = if (highlights.isNotEmpty()) {
@@ -757,16 +774,19 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
         } else {
             cleanComment
         }
-        val authorName = loggedInName.value.ifBlank { "Member" }
-        val newReview = ReviewItem(
-            id = "rev_${java.util.UUID.randomUUID()}",
-            userName = authorName,
-            rating = rating,
-            timeAgo = "Just now",
-            comment = formattedComment
-        )
         viewModelScope.launch {
+            val authorName = repository.getCurrentUserDisplayName()
+                .ifBlank { loggedInName.value.trim() }
+                .ifBlank { "Member" }
+            val newReview = ReviewItem(
+                id = "rev_${java.util.UUID.randomUUID()}",
+                userName = authorName,
+                rating = rating,
+                timeAgo = "Just now",
+                comment = formattedComment
+            )
             repository.addReview(recipeId, newReview)
+            onCompleted()
         }
     }
 
@@ -813,7 +833,6 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
             return
         }
         val title = _newRecipeTitle.value.trim().ifBlank { "Homemade Recipe" }
-        val author = loggedInName.value.ifBlank { "My Cooking" }
         val servings = _newRecipeServings.value
         val durationText = _newRecipeDuration.value
         val durationMinutes = when {
@@ -859,28 +878,34 @@ class CookingViewModel(application: Application) : AndroidViewModel(application)
             )
         )
 
-        val newRecipe = Recipe(
-            id = recipeId,
-            title = title,
-            chefName = author,
-            difficulty = "Medium",
-            durationMinutes = durationMinutes,
-            calories = 380,
-            rating = 0.0,
-            reviewCount = 0,
-            isBookmarked = !asDraft,
-            category = _newRecipeCategory.value,
-            dietaryBadges = _newRecipeDietaryBadges.value.toList(),
-            allergens = emptyList(),
-            defaultServings = servings,
-            ingredients = ingredientsList,
-            steps = stepsList,
-            reviews = emptyList(),
-            isDraft = asDraft,
-            imageUri = _newRecipeImageUri.value
-        )
+        val category = _newRecipeCategory.value
+        val dietaryBadges = _newRecipeDietaryBadges.value.toList()
+        val imageUri = _newRecipeImageUri.value
 
         viewModelScope.launch {
+            val author = repository.getCurrentUserDisplayName()
+                .ifBlank { loggedInName.value.trim() }
+                .ifBlank { "My Cooking" }
+            val newRecipe = Recipe(
+                id = recipeId,
+                title = title,
+                chefName = author,
+                difficulty = "Medium",
+                durationMinutes = durationMinutes,
+                calories = 380,
+                rating = 0.0,
+                reviewCount = 0,
+                isBookmarked = !asDraft,
+                category = category,
+                dietaryBadges = dietaryBadges,
+                allergens = emptyList(),
+                defaultServings = servings,
+                ingredients = ingredientsList,
+                steps = stepsList,
+                reviews = emptyList(),
+                isDraft = asDraft,
+                imageUri = imageUri
+            )
             repository.publishUserRecipe(newRecipe)
             _newRecipeTitle.value = ""
             _newRecipeImageUri.value = ""
