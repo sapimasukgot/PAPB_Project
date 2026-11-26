@@ -14,9 +14,6 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
 
-/**
- * Password hashing using PBKDF2 with random 16-byte salt and constant-time comparison.
- */
 object PasswordHasher {
     private const val SALT_BYTES = 16
     private const val ITERATIONS = 120_000
@@ -57,9 +54,6 @@ object PasswordHasher {
     }
 }
 
-/**
- * AES-GCM encryption backed by AndroidKeyStore for protecting sensitive DataStore preferences.
- */
 object CryptoBox {
     private const val KEY_ALIAS = "easycooking_prefs_aes_key"
     private const val ANDROID_KEYSTORE = "AndroidKeyStore"

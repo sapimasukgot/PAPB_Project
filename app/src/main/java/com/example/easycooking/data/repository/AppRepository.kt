@@ -723,11 +723,28 @@ class AppRepository(
         }
     }
 
+    suspend fun getCurrentUserDisplayName(): String = withContext(ioDispatcher) {
+        val prefName = preferencesManager.loggedInNameFlow.first().trim()
+        if (prefName.isNotBlank()) return@withContext prefName
+        val email = preferencesManager.loggedInEmailFlow.first().trim()
+        if (email.isNotBlank()) {
+            val dbName = userDao.getUserByEmail(email)?.fullName?.trim().orEmpty()
+            if (dbName.isNotBlank()) return@withContext dbName
+        }
+        ""
+    }
+
     suspend fun exportRecipeToGrocery(
         recipe: Recipe,
-        targetServings: Int
+        targetServings: Int,
+        selectedIngredientIds: Set<String> = emptySet()
     ): ExportGroceryResult = withContext(ioDispatcher) {
-        if (recipe.ingredients.isEmpty()) {
+        val ingredientsToExport = if (selectedIngredientIds.isNotEmpty()) {
+            recipe.ingredients.filter { it.id in selectedIngredientIds }
+        } else {
+            recipe.ingredients
+        }
+        if (ingredientsToExport.isEmpty()) {
             return@withContext ExportGroceryResult(
                 status = ExportGroceryStatus.FAILED,
                 recipeTitle = recipe.title,
@@ -759,6 +776,32 @@ class AppRepository(
             }
 
             if (existingActiveList != null) {
+                val existingNames = existingActiveItems.map { it.name.trim().lowercase() }.toSet()
+                val newIngredients = ingredientsToExport.filter { it.name.trim().lowercase() !in existingNames }
+                if (newIngredients.isNotEmpty()) {
+                    val additionalItems = newIngredients.map { ingredient ->
+                        GroceryItemEntity(
+                            id = "item_${recipe.id}_${ingredient.id}_${UUID.randomUUID()}",
+                            listId = existingActiveList.id,
+                            recipeId = recipe.id,
+                            name = ingredient.name,
+                            quantity = ingredient.scaledAmount(multiplier),
+                            unit = ingredient.unit,
+                            category = GroceryCategories.refineCategory(ingredient.name, ingredient.category),
+                            isChecked = false
+                        )
+                    }
+                    groceryDao.insertItems(additionalItems)
+                    return@withContext ExportGroceryResult(
+                        status = ExportGroceryStatus.SUCCESS,
+                        listId = existingActiveList.id,
+                        recipeTitle = recipe.title,
+                        addedCount = additionalItems.size,
+                        updatedCount = 0,
+                        message = "Added ${additionalItems.size} new ingredient(s) to \"${existingActiveList.title}\"."
+                    )
+                }
+
                 val remainingCount = existingActiveItems.count { !it.isChecked }
                 val activeDetail = if (existingActiveItems.isNotEmpty()) {
                     " ($remainingCount/${existingActiveItems.size} item(s) remaining)"
@@ -774,7 +817,7 @@ class AppRepository(
             }
 
             val targetListId = "list_${UUID.randomUUID()}"
-            val itemsToInsert = recipe.ingredients.map { ingredient ->
+            val itemsToInsert = ingredientsToExport.map { ingredient ->
                 GroceryItemEntity(
                     id = "item_${recipe.id}_${ingredient.id}_${UUID.randomUUID()}",
                     listId = targetListId,
@@ -798,13 +841,19 @@ class AppRepository(
             )
             groceryDao.insertItems(itemsToInsert)
 
+            val createdMessage = if (selectedIngredientIds.isNotEmpty()) {
+                "Created grocery list \"${recipe.title}\" with ${itemsToInsert.size} selected ingredient(s)."
+            } else {
+                "Created grocery list \"${recipe.title}\" with ${itemsToInsert.size} ingredient(s)."
+            }
+
             ExportGroceryResult(
                 status = ExportGroceryStatus.SUCCESS,
                 listId = targetListId,
                 recipeTitle = recipe.title,
                 addedCount = itemsToInsert.size,
                 updatedCount = 0,
-                message = "Created grocery list \"${recipe.title}\" with ${itemsToInsert.size} ingredient(s)."
+                message = createdMessage
             )
         } catch (e: CancellationException) {
             throw e

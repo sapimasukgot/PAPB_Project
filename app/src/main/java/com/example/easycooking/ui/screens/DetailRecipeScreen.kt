@@ -110,7 +110,9 @@ fun RecipeDetailScreen(
     onWriteReviewClick: () -> Unit,
     onProfileClick: () -> Unit,
     onSignInClick: () -> Unit = {},
-    onOpenGroceryList: ((String) -> Unit)? = null
+    onOpenGroceryList: ((String) -> Unit)? = null,
+    openReviewsTab: Boolean = false,
+    onReviewsTabOpened: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
@@ -141,6 +143,12 @@ fun RecipeDetailScreen(
     val checkedIds = checkedIngredientsMap[recipe.id].orEmpty()
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
+    LaunchedEffect(openReviewsTab) {
+        if (openReviewsTab) {
+            selectedTabIndex = 2
+            onReviewsTabOpened()
+        }
+    }
     val tabTitles = listOf("Ingredients", "Steps", "Reviews")
     var exportResult by remember { mutableStateOf<ExportGroceryResult?>(null) }
     var showAuthDialog by remember { mutableStateOf(false) }
@@ -490,6 +498,44 @@ fun RecipeDetailScreen(
                         }
                     }
                 } else {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (checkedIds.isEmpty()) {
+                                    "Tap ingredients to select items for grocery"
+                                } else {
+                                    "${checkedIds.size} of ${recipe.ingredients.size} selected"
+                                },
+                                fontSize = 12.sp,
+                                color = DarkTextSecondary
+                            )
+                            val allSelected = checkedIds.size == recipe.ingredients.size
+                            Text(
+                                text = if (allSelected) "Clear" else "Select All",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AmberBadgeText,
+                                modifier = Modifier
+                                    .clickable {
+                                        if (allSelected) {
+                                            viewModel.setDetailIngredientsChecked(recipe.id, emptySet())
+                                        } else {
+                                            viewModel.setDetailIngredientsChecked(
+                                                recipe.id,
+                                                recipe.ingredients.map { it.id }.toSet()
+                                            )
+                                        }
+                                    }
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                     items(recipe.ingredients, key = { it.id }) { ingredient ->
                         val isChecked = checkedIds.contains(ingredient.id)
                         Row(
@@ -853,11 +899,16 @@ fun RecipeDetailScreen(
                 HorizontalDivider(thickness = 1.dp, color = BorderGray)
                 Box(modifier = Modifier.padding(16.dp)) {
                     if (selectedTabIndex == 0) {
+                        val exportButtonText = if (checkedIds.isNotEmpty()) {
+                            "Export Selected (${checkedIds.size}) to Grocery"
+                        } else {
+                            "Export All to Grocery Checklist"
+                        }
                         PrimaryYellowButton(
-                            text = "Export to Grocery Checklist",
+                            text = exportButtonText,
                             onClick = {
                                 if (isLoggedIn) {
-                                    viewModel.exportRecipeToGrocery(recipe, servings) { result ->
+                                    viewModel.exportRecipeToGrocery(recipe, servings, checkedIds) { result ->
                                         exportResult = result
                                     }
                                 } else {
@@ -1385,12 +1436,43 @@ fun FinishedCookingScreen(
     recipeId: String,
     viewModel: CookingViewModel,
     onRateRecipeClick: (Int) -> Unit,
-    onDoneClick: () -> Unit
+    onDoneClick: () -> Unit,
+    onSignInClick: () -> Unit = {}
 ) {
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
     val recipes by viewModel.recipes.collectAsState()
     val recipe = recipes.find { it.id == recipeId } ?: recipes.firstOrNull() ?: return
     var userRating by remember { mutableIntStateOf(5) }
+    var showAuthDialog by remember { mutableStateOf(false) }
     val stepsCount = recipe.steps.size.coerceAtLeast(1)
+
+    if (showAuthDialog) {
+        AlertDialog(
+            onDismissRequest = { showAuthDialog = false },
+            title = {
+                Text("Member Feature", fontWeight = FontWeight.Bold, color = DarkText)
+            },
+            text = {
+                Text("Please sign in or register to rate and review recipes.", fontSize = 13.sp, color = DarkTextSecondary)
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showAuthDialog = false
+                        onSignInClick()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryYellow, contentColor = DarkText)
+                ) {
+                    Text("Sign In / Register", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAuthDialog = false }) {
+                    Text("Later", color = DarkText)
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -1559,7 +1641,13 @@ fun FinishedCookingScreen(
         Column(modifier = Modifier.fillMaxWidth()) {
             PrimaryYellowButton(
                 text = "Rate & Review Recipe",
-                onClick = { onRateRecipeClick(userRating) }
+                onClick = {
+                    if (isLoggedIn) {
+                        onRateRecipeClick(userRating)
+                    } else {
+                        showAuthDialog = true
+                    }
+                }
             )
 
             Spacer(modifier = Modifier.height(12.dp))

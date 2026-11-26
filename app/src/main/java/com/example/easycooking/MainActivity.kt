@@ -311,6 +311,9 @@ fun EasyCookingApp(
                 arguments = listOf(navArgument("recipeId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val recipeId = backStackEntry.arguments?.getString("recipeId") ?: "1"
+                val openReviewsTab by backStackEntry.savedStateHandle
+                    .getStateFlow("open_reviews_tab", false)
+                    .collectAsState()
                 RecipeDetailScreen(
                     recipeId = recipeId,
                     viewModel = viewModel,
@@ -327,6 +330,10 @@ fun EasyCookingApp(
                     onSignInClick = { navController.navigate(Screen.Login.route) },
                     onOpenGroceryList = { listId ->
                         navController.navigate(Screen.GroceryDetail.createRoute(listId))
+                    },
+                    openReviewsTab = openReviewsTab,
+                    onReviewsTabOpened = {
+                        backStackEntry.savedStateHandle["open_reviews_tab"] = false
                     }
                 )
             }
@@ -361,7 +368,8 @@ fun EasyCookingApp(
                     },
                     onDoneClick = {
                         navController.popBackStack(Screen.MainContainer.route, false)
-                    }
+                    },
+                    onSignInClick = { navController.navigate(Screen.Login.route) }
                 )
             }
 
@@ -390,7 +398,16 @@ fun EasyCookingApp(
                         initialRating = initialRating,
                         viewModel = viewModel,
                         onBackClick = { navController.popBackStack() },
-                        onSubmitSuccess = { navController.popBackStack() }
+                        onSubmitSuccess = {
+                            val poppedToDetail = navController.popBackStack(Screen.RecipeDetail.route, false)
+                            if (poppedToDetail) {
+                                navController.currentBackStackEntry
+                                    ?.savedStateHandle
+                                    ?.set("open_reviews_tab", true)
+                            } else {
+                                navController.popBackStack()
+                            }
+                        }
                     )
                 }
             }

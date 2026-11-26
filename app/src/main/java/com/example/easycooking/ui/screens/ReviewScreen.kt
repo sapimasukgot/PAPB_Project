@@ -67,6 +67,7 @@ fun WriteReviewScreen(
     var reviewComment by remember { mutableStateOf("") }
     var commentError by remember { mutableStateOf<String?>(null) }
     var selectedHighlights by remember { mutableStateOf(setOf("Easy to Follow", "Great Flavor")) }
+    var isSubmitting by remember { mutableStateOf(false) }
 
     val highlightTags = listOf("Easy to Follow", "Accurate Time", "Great Flavor")
 
@@ -284,12 +285,16 @@ fun WriteReviewScreen(
 
         PrimaryYellowButton(
             text = "Submit Review",
+            enabled = !isSubmitting,
             onClick = {
+                if (isSubmitting) return@PrimaryYellowButton
                 if (reviewComment.isBlank()) {
                     commentError = "Please write a brief comment before submitting."
                 } else {
-                    viewModel.addReview(recipe.id, selectedRating, reviewComment, selectedHighlights)
-                    onSubmitSuccess()
+                    isSubmitting = true
+                    viewModel.addReview(recipe.id, selectedRating, reviewComment, selectedHighlights) {
+                        onSubmitSuccess()
+                    }
                 }
             }
         )
