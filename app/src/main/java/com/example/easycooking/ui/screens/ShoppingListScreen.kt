@@ -43,6 +43,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.easycooking.model.ExportGroceryResult
 import com.example.easycooking.model.GroceryCategories
+import com.example.easycooking.model.GroceryItem
 import com.example.easycooking.model.GroceryList
 import com.example.easycooking.ui.components.ExportGroceryResultDialog
 import com.example.easycooking.ui.components.PrimaryYellowButton
@@ -76,6 +78,14 @@ import com.example.easycooking.ui.theme.PrimaryYellow
 import com.example.easycooking.ui.theme.TipBannerBg
 import com.example.easycooking.ui.theme.TipBannerText
 import com.example.easycooking.viewmodel.CookingViewModel
+
+const val ALL_ACTIVE_GROCERY_LIST_ID = "__all_active__"
+
+private data class CombinedGroceryEntry(
+    val listId: String,
+    val listTitle: String,
+    val item: GroceryItem
+)
 
 @Composable
 fun GroceryOverviewScreen(
@@ -298,11 +308,10 @@ fun GroceryOverviewScreen(
 
                     Button(
                         onClick = {
-                            val firstList = activeLists.firstOrNull()
-                            if (firstList != null) {
-                                onListClick(firstList.id)
-                            } else {
-                                showNewListDialog = true
+                            when {
+                                activeLists.size > 1 -> onListClick(ALL_ACTIVE_GROCERY_LIST_ID)
+                                activeLists.size == 1 -> onListClick(activeLists.first().id)
+                                else -> showNewListDialog = true
                             }
                         },
                         shape = RoundedCornerShape(20.dp),
@@ -580,9 +589,32 @@ fun GroceryDetailScreen(
 ) {
     val groceryLists by viewModel.groceryLists.collectAsState()
     val recipes by viewModel.recipes.collectAsState()
-    val list = groceryLists.find { it.id == listId }
+    val isCombinedMode = listId == ALL_ACTIVE_GROCERY_LIST_ID
 
-    if (list == null) {
+    var sessionListIds by remember(listId) {
+        mutableStateOf(
+            if (isCombinedMode) {
+                groceryLists.filter { !it.isCompleted }.map { it.id }.toSet()
+            } else {
+                emptySet()
+            }
+        )
+    }
+
+    LaunchedEffect(listId, groceryLists) {
+        if (isCombinedMode) {
+            val activeIds = groceryLists.filter { !it.isCompleted }.map { it.id }.toSet()
+            sessionListIds = if (sessionListIds.isEmpty()) activeIds else sessionListIds + activeIds
+        }
+    }
+
+    val includedLists = if (isCombinedMode) {
+        groceryLists.filter { it.id in sessionListIds }
+    } else {
+        listOfNotNull(groceryLists.find { it.id == listId })
+    }
+
+    if (!isCombinedMode && includedLists.isEmpty()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -598,12 +630,20 @@ fun GroceryDetailScreen(
         return
     }
 
+    val singleList = if (!isCombinedMode) includedLists.first() else null
+    val entries = includedLists.flatMap { gl ->
+        gl.items.map { CombinedGroceryEntry(gl.id, gl.title, it) }
+    }
+    val totalItemsCount = entries.size
+    val remainingItemsCount = entries.count { !it.item.isChecked }
+    val targetListForAdd = singleList ?: includedLists.firstOrNull { !it.isCompleted } ?: includedLists.firstOrNull()
+
     val aisleSections = GroceryCategories.AISLE_SECTIONS
     var selectedSection by remember { mutableStateOf(GroceryCategories.DEFAULT_SECTION) }
     var newCustomItem by remember { mutableStateOf("") }
     val isMetricUnit by viewModel.isMetricUnit.collectAsState()
-    val groupedItems = list.items
-        .groupBy { GroceryCategories.refineCategory(it.name, it.category) }
+    val groupedEntries = entries
+        .groupBy { GroceryCategories.refineCategory(it.item.name, it.item.category) }
         .toSortedMap(compareBy<String> { GroceryCategories.aisleSortIndex(it) }.thenBy { it })
 
     Column(
@@ -659,13 +699,30 @@ fun GroceryDetailScreen(
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val headerImageUri = recipes.find { it.title.equals(list.title, ignoreCase = true) }?.imageUri.orEmpty()
-            RecipeImageBox(
-                imageUri = headerImageUri,
-                modifier = Modifier
-                    .size(54.dp)
-                    .clip(RoundedCornerShape(10.dp))
-            )
+            if (isCombinedMode) {
+                Box(
+                    modifier = Modifier
+                        .size(54.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(AmberBadgeBg),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.ShoppingCart,
+                        contentDescription = null,
+                        tint = AmberBadgeText,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            } else {
+                val headerImageUri = recipes.find { it.title.equals(singleList!!.title, ignoreCase = true) }?.imageUri.orEmpty()
+                RecipeImageBox(
+                    imageUri = headerImageUri,
+                    modifier = Modifier
+                        .size(54.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                )
+            }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Row(
@@ -674,7 +731,7 @@ fun GroceryDetailScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "RECIPE NOTE",
+                        text = if (isCombinedMode) "COMBINED SHOPPING CART" else "RECIPE NOTE",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = DarkTextSecondary
@@ -686,7 +743,7 @@ fun GroceryDetailScreen(
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = "${list.remainingItems}/${list.totalItems} left",
+                            text = "$remainingItemsCount/$totalItemsCount left",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = AmberBadgeText
@@ -694,7 +751,7 @@ fun GroceryDetailScreen(
                     }
                 }
                 Text(
-                    text = list.title,
+                    text = if (isCombinedMode) "All Active Lists (${includedLists.size} menus)" else singleList!!.title,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = DarkText
@@ -731,7 +788,7 @@ fun GroceryDetailScreen(
         Spacer(modifier = Modifier.height(10.dp))
 
         LazyColumn(modifier = Modifier.weight(1f)) {
-            if (groupedItems.isEmpty()) {
+            if (groupedEntries.isEmpty()) {
                 item {
                     Box(
                         modifier = Modifier
@@ -749,7 +806,7 @@ fun GroceryDetailScreen(
                     }
                 }
             } else {
-                groupedItems.forEach { (categoryName, categoryItems) ->
+                groupedEntries.forEach { (categoryName, categoryEntries) ->
                     item(key = "header_$categoryName") {
                         Text(
                             text = categoryName.uppercase(),
@@ -760,20 +817,21 @@ fun GroceryDetailScreen(
                         )
                     }
 
-                    items(categoryItems, key = { it.id }) { item ->
+                    items(categoryEntries, key = { "${it.listId}_${it.item.id}" }) { entry ->
+                        val item = entry.item
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(LightGrayBg)
-                                .clickable { viewModel.toggleGroceryItemCheck(list.id, item.id) }
+                                .clickable { viewModel.toggleGroceryItemCheck(entry.listId, item.id) }
                                 .padding(horizontal = 10.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Checkbox(
                                 checked = item.isChecked,
-                                onCheckedChange = { viewModel.toggleGroceryItemCheck(list.id, item.id) },
+                                onCheckedChange = { viewModel.toggleGroceryItemCheck(entry.listId, item.id) },
                                 colors = CheckboxDefaults.colors(
                                     checkedColor = PrimaryYellow,
                                     checkmarkColor = DarkText
@@ -789,7 +847,7 @@ fun GroceryDetailScreen(
                                     textDecoration = if (item.isChecked) TextDecoration.LineThrough else TextDecoration.None
                                 )
                                 Text(
-                                    text = item.category,
+                                    text = if (isCombinedMode) "${entry.listTitle} | ${item.category}" else item.category,
                                     fontSize = 11.sp,
                                     color = DarkTextSecondary
                                 )
@@ -859,8 +917,8 @@ fun GroceryDetailScreen(
                             .clip(CircleShape)
                             .background(PrimaryYellow)
                             .clickable {
-                                if (newCustomItem.isNotBlank()) {
-                                    viewModel.addCustomGroceryItem(list.id, newCustomItem, selectedSection)
+                                if (newCustomItem.isNotBlank() && targetListForAdd != null) {
+                                    viewModel.addCustomGroceryItem(targetListForAdd.id, newCustomItem, selectedSection)
                                     newCustomItem = ""
                                 }
                             },
@@ -884,10 +942,10 @@ fun GroceryDetailScreen(
                     Icon(Icons.Filled.Lightbulb, contentDescription = null, tint = AmberBadgeText, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = if (list.remainingItems == 0 && list.totalItems > 0) {
-                            "All ${list.totalItems} items checked off and ready to cook."
+                        text = if (remainingItemsCount == 0 && totalItemsCount > 0) {
+                            "All $totalItemsCount items checked off and ready to cook."
                         } else {
-                            "${list.remainingItems} items remaining across ${groupedItems.size} aisle category(s)."
+                            "$remainingItemsCount items remaining across ${groupedEntries.size} aisle category(s)."
                         },
                         fontSize = 12.sp,
                         color = TipBannerText
